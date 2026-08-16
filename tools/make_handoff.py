@@ -126,10 +126,11 @@ def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
           "so this is power or wiring, not an absent target."),
          "HAVE_SENSOR " + str(f["HAVE_SENSOR"])),
         ("ok", "Piezo emitter",
-         "Wired and answering an audible sweep. Silent during the demo, which "
-         "is correct: the carrier is 25 kHz and the raised-cosine envelope "
-         "exists so there is no click to hear either. The lamp and the log are "
-         "what show emission.",
+         "Wired and working. A 120 ms chirp at 2.2 kHz marks the start of "
+         "every emission, then the real 25 kHz carrier runs underneath for its "
+         "full length. The chirp is a marker and must be described as one - "
+         "calling it the ultrasound would be the single dishonest sentence in "
+         "this project.",
          "GPIO" + p.get("PIN_EMIT", "25")),
         ("ok", "Third lamp",
          "Yellow on GPIO26, lit for one refusal only: the target is beyond "

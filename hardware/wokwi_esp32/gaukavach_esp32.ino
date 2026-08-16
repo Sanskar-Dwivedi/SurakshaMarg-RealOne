@@ -139,6 +139,21 @@ const int LAMP_ONE  = 14;
  *
  * The other four refusals share the red lamp. They are about who or what is
  * there, not where. */
+/* A short audible chirp at the start of every emission.
+ *
+ * The carrier is 25 kHz and nobody in the room can hear it, so without this
+ * the emitter contributes nothing an audience can perceive. The chirp is a
+ * MARKER, not the carrier: 120 ms at 2.2 kHz, then the real 25 kHz burst runs
+ * for its full length underneath.
+ *
+ * This is a demo affordance and has to be described as one. Saying "that beep
+ * is the ultrasound" would be the one dishonest sentence in the whole project.
+ * The boot banner declares it, and the right line is: the chirp tells you when
+ * it emitted; what it actually emits, you cannot hear. */
+#define AUDIBLE_MARKER 1
+const uint32_t MARKER_HZ = 2200;
+const uint16_t MARKER_MS = 120;
+
 #define FAR_LAMP_MODE 1
 const int LAMP_FAR = 26;      // yellow on this rig
 bool farRefusal = false;
@@ -202,12 +217,14 @@ uint32_t scaled(uint32_t ms) { return ms / DEMO_SPEED; }
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
 static inline void emitAttach()            { ledcAttach(PIN_EMIT, CARRIER_HZ, LEDC_RES); }
 static inline void emitDuty(uint32_t duty) { ledcWrite(PIN_EMIT, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(PIN_EMIT, hz); }
 #else
 static inline void emitAttach() {
   ledcSetup(LEDC_CH, CARRIER_HZ, LEDC_RES);
   ledcAttachPin(PIN_EMIT, LEDC_CH);
 }
 static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(LEDC_CH, hz); }
 #endif
 
 void emitStop();
@@ -524,6 +541,14 @@ void selfCheck() {
  * nothing else needs servicing during a 25 ms envelope, and it keeps the shape
  * identical to emitter.py rather than approximated by a scheduler. */
 void emitStart() {
+#if AUDIBLE_MARKER
+  /* Marker first, then the real carrier. Deliberately before the ramp, so the
+   * envelope that follows is untouched by it. */
+  emitTone(MARKER_HZ);
+  delay(MARKER_MS);
+  emitTone(0);
+  emitAttach();                 // back to CARRIER_HZ after the tone changed it
+#endif
   for (uint16_t t = 0; t <= RAMP_MS; t++) {
     float x = (float)t / RAMP_MS;                 // 0..1
     float e = 0.5f * (1.0f - cosf(PI * x));       // raised cosine

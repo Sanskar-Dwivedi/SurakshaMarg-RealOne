@@ -77,10 +77,12 @@ inline SerialT Serial;
 #if defined(FAKE_CORE3)
   #define ESP_ARDUINO_VERSION_MAJOR 3
   inline bool ledcAttach(uint8_t, uint32_t, uint8_t) { return true; }
+  inline void ledcWriteTone(uint8_t, uint32_t) {}
   inline void ledcWrite(uint8_t, uint32_t) {}
 #else
   #define ESP_ARDUINO_VERSION_MAJOR 2
   inline void ledcSetup(uint8_t, uint32_t, uint8_t) {}
   inline void ledcAttachPin(uint8_t, uint8_t) {}
   inline void ledcWrite(uint8_t, uint32_t) {}
+  inline void ledcWriteTone(uint8_t, uint32_t) {}
 #endif

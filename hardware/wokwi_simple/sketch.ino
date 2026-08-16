@@ -130,6 +130,20 @@ const int LAMP_STOP = 27;      // red: refused, and blinking for escalated
 const int LAMP_ONE  = 14;
 #endif
 
+/* A third lamp for one refusal in particular: the target is out of acoustic
+ * range. Set to 0 if nothing is wired to GPIO26.
+ *
+ * Worth its own light because it is the one refusal that is about geometry
+ * rather than about the animal. Lit, the three lamps read as a map - red too
+ * close, green in range, this one too far - so moving a hand through the
+ * detection cone tells the whole spatial story without a word of narration.
+ *
+ * The other four refusals share the red lamp. They are about who or what is
+ * there, not where. */
+#define FAR_LAMP_MODE 1
+const int LAMP_FAR = 26;
+bool farRefusal = false;
+
 /* ---------------- LEDC ---------------- */
 const int      LEDC_CH   = 0;
 const int      LEDC_RES  = 8;          // 8-bit duty, 0..255
@@ -583,6 +597,9 @@ void leds(bool p, bool r, bool e) {
   digitalWrite(LAMP_GO, p);
   bool blink = ((millis() / 250) % 2) == 0;
   digitalWrite(LAMP_STOP, e ? blink : r);
+#if FAR_LAMP_MODE
+  digitalWrite(LAMP_FAR, farRefusal);
+#endif
 }
 #else
 void leds(bool p, bool r, bool e) {
@@ -601,6 +618,7 @@ void loop() {
    * more passes to be believed, and the governor would permit emission in the
    * gap. Safety inputs must be settled before they are needed, not after. */
   consoleTick();
+  farRefusal = false;          // set below only by the out-of-range refusal
   bool person    = pressed(B_PERSON)    || typedPerson;
   bool nonTarget = pressed(B_NONTARGET) || typedNonTarget;
   uint8_t group  = readGroup();
@@ -653,7 +671,8 @@ void loop() {
   else if (person)                   deny = "a person is inside the exposure cone";
   else if (nonTarget)                deny = "a non-target species is inside the cone";
   else if (group > MAX_GROUP)        deny = "group large enough that a startle could cascade";
-  else if (metres > RANGE_MAX_M)     deny = "beyond the acoustic envelope";
+  else if (metres > RANGE_MAX_M)   { deny = "beyond the acoustic envelope";
+                                     farRefusal = true; }
   else if (metres <= LINE_M)         deny = "already at the carriageway - fleeing would cross it";
   else if (state == COOLDOWN &&
            (now - lastEmissionEnd) < scaled(MIN_SILENCE_MS))

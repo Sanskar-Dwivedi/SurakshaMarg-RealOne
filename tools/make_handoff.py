@@ -114,10 +114,15 @@ def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
          "the switch are already joined inside it. The stop itself is intact "
          "and typed with e.",
          "HAVE_ESTOP " + str(f["HAVE_ESTOP"])),
-        ("crit", "Distance sensor",
-         "0 of 20 pings returned, twice, on separate days. With a 25 ms timeout "
-         "it should echo off a wall even with nothing in front of it, so this "
-         "is power or wiring, not an absent target.",
+        (("ok" if f["HAVE_SENSOR"] else "crit"), "Distance sensor",
+         ("Real detection. 344 of 355 pings returned across 16-105 cm once it "
+          "was moved to 5 V from VIN with the divider restored. It had been "
+          "silent on 3.3 V while still holding ECHO low - powered enough to "
+          "drive the line, not enough to fire the transmitter."
+          if f["HAVE_SENSOR"] else
+          "0 of 20 pings returned, twice, on separate days. With a 25 ms "
+          "timeout it should echo off a wall even with nothing in front of it, "
+          "so this is power or wiring, not an absent target."),
          "HAVE_SENSOR " + str(f["HAVE_SENSOR"])),
         ("idle", "Piezo emitter",
          "Never tested. A 500 Hz to 4 kHz sweep is flashed and ready; it needs "
@@ -340,8 +345,8 @@ generated, so it cannot quietly describe a rig that has changed.</p>
 
 <section>
 <h2>Status</h2>
-<p class="lede">Five subsystems work. Two are substituted by typed input and say
-so at boot. Two are unresolved, and neither blocks the demo.</p>
+<p class="lede">{n_ok} subsystems work. {n_warn} are substituted by typed input
+and say so at boot. {n_open} unresolved, and none of them blocks the demo.</p>
 <div class="board">{status}</div>
 </section>
 
@@ -440,6 +445,9 @@ the status above follows.</p>
 
 def main() -> None:
     f, p, c = flags(), pins(), limits()
+    if f["HAVE_SENSOR"]:
+        # resolved: keep the page honest rather than carrying a fixed fault
+        OPEN[:] = [o for o in OPEN if not o[0].startswith("Distance sensor")]
     sp = c["DEMO_SPEED"]
 
     status = "".join(
@@ -480,7 +488,11 @@ def main() -> None:
     learned = "".join(
         f"<div><b>{esc(h)}</b><p>{esc(d)}</p></div>" for h, d in LEARNED)
 
+    rows = status_rows(f, p)
     page = PAGE.format(
+        n_ok=sum(1 for r in rows if r[0] == "ok"),
+        n_warn=sum(1 for r in rows if r[0] == "warn"),
+        n_open=sum(1 for r in rows if r[0] in ("crit", "idle")),
         tested=TESTED, status=status, rules=rules, limits=lim_html,
         open=open_html, learned=learned, speed=sp,
         max_act=c["MAX_ACTIVATION_MS"] / 1000,

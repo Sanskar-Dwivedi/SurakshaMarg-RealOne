@@ -90,8 +90,14 @@ const int POT_GROUP     = 34;   // ADC1, input-only
 /* Set to 0 when no HC-SR04 is fitted or it returns no echo. Distance then
  * comes from the console: type d80 for 80 cm. The governor cannot tell the
  * difference, because it only ever sees a distance - which is exactly why you
- * have to say out loud that the distance input is being typed. */
-#define HAVE_SENSOR 0
+ * have to say out loud that the distance input is being typed.
+ *
+ * Now 1: on 5 V from VIN through a rail, with the 1k/2k divider restored, the
+ * module answers 344 of 355 pings across 16-105 cm. It had been silent on 3.3 V
+ * while still holding ECHO low - powered enough to drive the line, not enough
+ * to fire the transmitter. Distance is sensed again; only the group size and
+ * the emergency stop remain typed. */
+#define HAVE_SENSOR 1
 
 /* Set to 1 when only two of the three status LEDs work. Measured on this
  * board: GPIO26 and GPIO14 drive lamps, GPIO27 drives nothing. Rather than

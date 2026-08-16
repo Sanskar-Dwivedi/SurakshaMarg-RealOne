@@ -102,3 +102,31 @@ def test_esp32_ramps_its_envelope():
     src = SKETCHES[1].read_text(encoding="utf-8")
     assert "cosf" in src and "RAMP_MS" in src
     assert "ledcWrite" in src
+
+
+def test_wiring_check_uses_the_same_pins_as_the_governor():
+    """The diagnostic is only trustworthy if it probes the pins under test.
+
+    A wiring check on a different pin map does not fail loudly - it reports a
+    perfectly healthy circuit that is not the one you built, which is worse
+    than having no diagnostic at all.
+    """
+    check = ROOT / "hardware" / "wiring_check" / "wiring_check.ino"
+    if not check.is_file():
+        pytest.skip("no wiring_check sketch in this tree")
+
+    esp = (ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino").read_text(
+        encoding="utf-8")
+    diag = check.read_text(encoding="utf-8")
+
+    names = ("PIN_TRIG", "PIN_ECHO", "PIN_EMIT", "LED_PERMIT", "LED_REFUSE",
+             "LED_ESCALATE", "LED_ARMED", "BTN_PERSON", "BTN_NONTARGET",
+             "BTN_ESTOP", "POT_GROUP")
+    for n in names:
+        a = re.search(rf"\b{n}\s*=\s*(\d+)", esp)
+        b = re.search(rf"\b{n}\s*=\s*(\d+)", diag)
+        assert a, f"{n} missing from the governor sketch"
+        assert b, f"{n} missing from the wiring check"
+        assert a.group(1) == b.group(1), (
+            f"{n} is GPIO{a.group(1)} in the governor but GPIO{b.group(1)} "
+            f"in the wiring check")

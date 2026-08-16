@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "author": "GauKavach",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-hc-sr04", "id": "sr04", "top": -180, "left": 200,
+      "attrs": { "distance": "80" } },
+    { "type": "wokwi-led", "id": "ledGreen", "top": -60, "left": 230,
+      "attrs": { "color": "green", "label": "PERMIT" } },
+    { "type": "wokwi-led", "id": "ledRed", "top": -60, "left": 300,
+      "attrs": { "color": "red", "label": "REFUSE" } },
+    { "type": "wokwi-led", "id": "ledAmber", "top": -60, "left": 370,
+      "attrs": { "color": "orange", "label": "ESCALATE" } },
+    { "type": "wokwi-buzzer", "id": "bz", "top": -60, "left": 440,
+      "attrs": { "volume": "0.1" } },
+    { "type": "wokwi-pushbutton", "id": "btnPerson", "top": 90, "left": 200,
+      "attrs": { "color": "blue", "label": "PERSON" } },
+    { "type": "wokwi-pushbutton", "id": "btnNonTarget", "top": 170, "left": 200,
+      "attrs": { "color": "yellow", "label": "DOG / GOAT" } },
+    { "type": "wokwi-pushbutton", "id": "btnEstop", "top": 250, "left": 200,
+      "attrs": { "color": "red", "label": "E-STOP" } },
+    { "type": "wokwi-resistor", "id": "rEstop", "top": 258, "left": 300,
+      "attrs": { "value": "10000" } },
+    { "type": "wokwi-potentiometer", "id": "pot", "top": 120, "left": 400,
+      "attrs": { "label": "GROUP SIZE" } }
+  ],
+  "connections": [
+    ["esp:3V3", "sr04:VCC", "red", ["v-20"]],
+    ["esp:GND.1", "sr04:GND", "black", ["v-30"]],
+    ["esp:13", "sr04:TRIG", "green", ["v-40"]],
+    ["sr04:ECHO", "esp:VN", "blue", ["v20"]],
+
+    ["esp:26", "ledGreen:A", "green", ["v10"]],
+    ["ledGreen:C", "esp:GND.2", "black", ["v-20"]],
+    ["esp:27", "ledRed:A", "red", ["v15"]],
+    ["ledRed:C", "esp:GND.2", "black", ["v-25"]],
+    ["esp:14", "ledAmber:A", "orange", ["v20"]],
+    ["ledAmber:C", "esp:GND.2", "black", ["v-30"]],
+
+    ["esp:25", "bz:1", "violet", ["v25"]],
+    ["bz:2", "esp:GND.2", "black", ["v-35"]],
+
+    ["esp:32", "btnPerson:1.l", "blue", ["v10"]],
+    ["btnPerson:2.l", "esp:GND.3", "black", ["v20"]],
+    ["esp:33", "btnNonTarget:1.l", "gold", ["v20"]],
+    ["btnNonTarget:2.l", "esp:GND.3", "black", ["v30"]],
+    ["esp:35", "btnEstop:1.l", "red", ["v30"]],
+    ["btnEstop:2.l", "esp:GND.3", "black", ["v40"]],
+    ["btnEstop:1.l", "rEstop:1", "gray", ["v-10"]],
+    ["rEstop:2", "esp:3V3", "red", ["v-40"]],
+
+    ["pot:VCC", "esp:3V3", "red", ["v50"]],
+    ["pot:GND", "esp:GND.3", "black", ["v50"]],
+    ["pot:SIG", "esp:34", "purple", ["v40"]]
+  ],
+  "dependencies": {}
+}

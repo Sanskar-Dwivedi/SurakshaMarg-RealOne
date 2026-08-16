@@ -51,6 +51,10 @@ in the emitter supply so the E-stop cuts **power**, not just signal.
 
 ## Building it for real? Start here
 
+**[clear_breadboard.html](clear_breadboard.html)** — single-page attachment map
+with large labels and exact holes for every jumper, resistor, sensor pin,
+button, LED, potentiometer leg, and buzzer lead.
+
 **[build_steps.html](build_steps.html)** — eight steps, each with its own
 breadboard picture. Work already done is faded; what you add in that step is
 solid. Two of the steps exist purely to stop you damaging the ESP32, and both

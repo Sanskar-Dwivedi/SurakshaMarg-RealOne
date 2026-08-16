@@ -20,6 +20,27 @@ ROOT = Path(__file__).resolve().parents[1]
 DIAGRAMS = sorted((ROOT / "hardware").glob("wokwi_*/diagram.json"))
 IDS = [d.parent.name for d in DIAGRAMS]
 
+# A diagram is either a wiring reference for real hardware, or a deliberately
+# stripped simulator build. The difference is not cosmetic: the simulator build
+# drops the components that exist only to protect silicon, which is safe in a
+# browser and destructive on a bench.
+#
+# Simulator-only diagrams are exempted from the passive-component rules, but the
+# exemption is never silent - test_simulator_only_diagrams_declare_what_they_omit
+# below fails unless the folder carries a README that names each omission and
+# says why. An undeclared exemption is how a shortcut becomes a wiring guide.
+SIMULATOR_ONLY = {"wokwi_simple"}
+
+
+def profile_of(path: Path) -> str:
+    return "simulator-only" if path.parent.name in SIMULATOR_ONLY else "hardware"
+
+
+def skip_if_simulator_only(path: Path, what: str) -> None:
+    if profile_of(path) == "simulator-only":
+        pytest.skip(f"{path.parent.name} is simulator-only and declares that it "
+                    f"omits {what}; see its README")
+
 
 def load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -80,6 +101,7 @@ def test_led_polarity_is_the_right_way_round(path: Path):
 @pytest.mark.parametrize("path", DIAGRAMS, ids=IDS)
 def test_every_led_has_a_series_resistor(path: Path):
     """A bare LED on a GPIO is the classic way to cook a pin."""
+    skip_if_simulator_only(path, "LED series resistors")
     d = load(path)
     res = {p["id"] for p in d["parts"] if p["type"] == "wokwi-resistor"}
     for led in [p["id"] for p in d["parts"] if p["type"] == "wokwi-led"]:
@@ -90,6 +112,7 @@ def test_every_led_has_a_series_resistor(path: Path):
 
 @pytest.mark.parametrize("path", DIAGRAMS, ids=IDS)
 def test_buzzer_has_a_series_resistor(path: Path):
+    skip_if_simulator_only(path, "the buzzer series resistor")
     d = load(path)
     res = {p["id"] for p in d["parts"] if p["type"] == "wokwi-resistor"}
     for bz in [p["id"] for p in d["parts"] if p["type"] == "wokwi-buzzer"]:
@@ -152,8 +175,11 @@ ESP32_PINS = {
 }
 
 
-def test_esp32_uses_only_pin_names_wokwi_accepts():
-    d = load(ROOT / "hardware" / "wokwi_esp32" / "diagram.json")
+@pytest.mark.parametrize("path", DIAGRAMS, ids=IDS)
+def test_esp32_uses_only_pin_names_wokwi_accepts(path: Path):
+    d = load(path)
+    if not any(p["type"].startswith("board-esp32") for p in d["parts"]):
+        pytest.skip("not an ESP32 diagram")
     used = {ep.split(":", 1)[1] for a, b in nets(d) for ep in (a, b)
             if ep.startswith("esp:")}
     bad = sorted(used - ESP32_PINS)
@@ -175,3 +201,98 @@ def test_parts_are_laid_out_compactly(path: Path):
     lefts = [p["left"] for p in d["parts"]]
     assert max(tops) - min(tops) <= 700, "parts spread too far vertically"
     assert max(lefts) - min(lefts) <= 700, "parts spread too far horizontally"
+
+
+@pytest.mark.parametrize("path", DIAGRAMS, ids=IDS)
+def test_simulator_only_diagrams_declare_what_they_omit(path: Path):
+    """An exemption nobody wrote down is indistinguishable from a mistake.
+
+    Someone will eventually open the simplest diagram and build from it. The
+    README is what stops that being silently wrong, so its presence and its
+    contents are part of the contract, not documentation hygiene.
+    """
+    if profile_of(path) != "simulator-only":
+        return
+    readme = path.parent / "README.md"
+    assert readme.exists(), (
+        f"{path.parent.name} is exempt from the passive-component checks but "
+        f"has no README saying so")
+    text = readme.read_text(encoding="utf-8").lower()
+    assert "simulator-only" in text, "the README must state the profile"
+    for phrase in ("not a wiring reference", "series resistor", "divider"):
+        assert phrase in text, (
+            f"the README does not mention '{phrase}'; every omission has to be "
+            f"named or the exemption is not really declared")
+
+
+@pytest.mark.parametrize("path", DIAGRAMS, ids=IDS)
+def test_simulator_only_diagrams_keep_the_estop_pull_up(path: Path):
+    """The one passive that is function, not protection, and so is never dropped.
+
+    GPIO34-39 have no internal pull-up in the silicon - simulated or not. Drop
+    this resistor and the E-stop input floats in Wokwi exactly as it would on a
+    bench, and the demo dies at random.
+    """
+    if profile_of(path) != "simulator-only":
+        return
+    d = load(path)
+    values = {p["id"]: p.get("attrs", {}).get("value")
+              for p in d["parts"] if p["type"] == "wokwi-resistor"}
+    assert "10000" in values.values(), (
+        "the 10k E-stop pull-up is missing; it is not protection, it is the "
+        "only thing holding an input-only pin at a defined level")
+
+
+def test_the_manual_covers_every_wire_exactly_once():
+    """A build manual that silently skips a wire produces a circuit that half works.
+
+    The step-by-step page groups connections by the parts each step adds. If a
+    part id is ever renamed or a wire added without touching the groups, some
+    wire ends up in no step at all - and the reader's simulation is missing it
+    with nothing to say so. Checked by counting rather than by reading.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "make_wokwi_steps", ROOT / "tools" / "make_wokwi_steps.py")
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    d = load(ROOT / "hardware" / "wokwi_simple" / "diagram.json")
+    listed: list[tuple[str, str]] = []
+    for key, group in mod.GROUPS:
+        later = {"rEstop"} if key == "buttons" else set()
+        listed += mod.wires_for(d, group, later)
+
+    every = [(c[0], c[1]) for c in d["connections"]]
+    missing = [w for w in every if w not in listed]
+    duplicated = [w for w in set(listed) if listed.count(w) > 1]
+    assert not missing, f"no step tells the reader to make these wires: {missing}"
+    assert not duplicated, f"these wires are listed in two steps: {duplicated}"
+    assert len(listed) == len(every)
+
+
+def test_the_pasteable_block_on_the_page_is_still_valid_json():
+    """What the reader copies has to be what Wokwi can parse.
+
+    The manual embeds diagram.json inside HTML, so it passes through escaping on
+    the way in. If that escaping ever leaks - a stray &amp; or &quot; surviving
+    into the rendered text - the paste produces a Wokwi project that will not
+    load, and the error appears on their screen, not in this repo.
+    """
+    import html as _html
+    import re as _re
+
+    page = ROOT / "hardware" / "wokwi_steps.html"
+    if not page.exists():
+        pytest.skip("run tools/make_wokwi_steps.py first")
+    text = page.read_text(encoding="utf-8")
+    m = _re.search(r'id="blockB">(.*?)</pre>', text, _re.S)
+    assert m, "the pasteable diagram block is missing from the page"
+
+    rendered = _html.unescape(m.group(1))
+    parsed = json.loads(rendered)          # raises if the escaping leaked
+    original = load(ROOT / "hardware" / "wokwi_simple" / "diagram.json")
+    assert parsed == original, (
+        "the block on the page is not the diagram this repo ships")

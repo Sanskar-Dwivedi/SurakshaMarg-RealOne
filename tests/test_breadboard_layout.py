@@ -140,3 +140,28 @@ def test_generated_page_is_pure_ascii():
         pytest.skip("run tools/make_breadboard.py first")
     bad = [c for c in page.read_text(encoding="utf-8") if ord(c) > 127]
     assert not bad, f"non-ASCII characters would be mis-decoded: {set(bad)}"
+
+
+def test_the_board_figure_calls_out_every_pin_the_sketch_uses(bb):
+    """A pin drawn grey reads as 'you do not need this one'.
+
+    The figure greys out unused pads on purpose, which makes an omission
+    indistinguishable from a decision. The pot wiper was missing from the map
+    for exactly this reason and looked entirely deliberate.
+    """
+    p = bb.pins()
+    used = bb.board_uses(p)
+    for name, gpio in p.items():
+        label = bb.silk(gpio)
+        assert label in used, (
+            f"{name} (GPIO{gpio}, printed {label}) is wired by the sketch but "
+            f"the board figure shows its pad as unused")
+
+
+def test_every_called_out_pin_exists_on_that_board(bb):
+    """The figure names one specific 30-pin board; do not invent pads on it."""
+    header = set(bb.DEVKIT_V1_LEFT) | set(bb.DEVKIT_V1_RIGHT)
+    for label in bb.board_uses(bb.pins()):
+        assert label in header, (
+            f"the figure calls out {label}, which is not on a DevKit V1 30-pin "
+            f"header - either the board data or the call-out is wrong")

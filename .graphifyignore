@@ -16,6 +16,9 @@ dashboard/simulator.html
 
 hardware/build_steps.html
 hardware/breadboard.html
+hardware/design.html
+hardware/bench.html
+hardware/wokwi_steps.html
 hardware/wiring.html
 hardware/wiring_uno.svg
 hardware/wiring_esp32.svg
@@ -23,6 +26,7 @@ hardware/wiring_esp32.svg
 # Duplicates of the sketches, kept only because Wokwi insists on the filename.
 hardware/wokwi_uno/sketch.ino
 hardware/wokwi_esp32/sketch.ino
+hardware/wokwi_simple/sketch.ino
 
 # Model weights and source footage: binary, huge, and not ours.
 *.pt

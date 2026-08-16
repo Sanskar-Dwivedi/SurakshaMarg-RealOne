@@ -21,13 +21,25 @@
  *   - a 40 kHz ranging element is the wrong part (above the 35 kHz cattle
  *     audiogram endpoint) and stands in for the signal chain only
  *
- * Board: ESP32 Dev Module.
+ * ARDUINO IDE SETTINGS
+ *   Tools > Board            ESP32 Arduino > ESP32 Dev Module
+ *   Tools > Upload Speed     921600  (drop to 115200 if uploads fail)
+ *   Tools > Port             whatever COM port appears when the board is plugged in
+ *   No libraries to install: everything used here ships with the ESP32 core.
+ * If the port never appears, it is the CP2102 / CH340 USB-serial driver, not
+ * the sketch. If upload stalls at "Connecting...", hold BOOT while it starts.
  *
  * The LEDC API changed between Arduino-ESP32 core 2.x and 3.x: ledcSetup() and
  * ledcAttachPin() were removed, and ledcWrite() now takes a PIN rather than a
- * channel. Wokwi ships core 3.x, most local Arduino IDE installs are still on
- * 2.x, so the two wrappers below pick the right one at compile time. Nothing
- * else in the sketch has to care.
+ * channel. Both Wokwi and this machine's IDE are on core 3.x; the wrappers
+ * below still cover 2.x so the sketch survives an older install elsewhere.
+ *
+ * REAL HARDWARE vs THE SIMULATOR
+ * A simulator hands you a clean sensor reading, a clean ADC and a bounce-free
+ * button. A breadboard hands you none of those, and each one has a specific
+ * way of ruining a live demo, so each is conditioned below: see 'input
+ * conditioning'. The governor logic itself is untouched - the whole point is
+ * that the rules are the same everywhere they are stated.
  */
 
 /* ---------------- pins ---------------- */
@@ -48,6 +60,69 @@ const int BTN_ESTOP     = 35;   // input-only pin, needs an external pull-up
  * sampled at reset. GPIO2 is the exception: it is the on-board LED, driven as
  * an output only, which is the standard and safe use of it. */
 const int POT_GROUP     = 34;   // ADC1, input-only
+
+/* ------------- what is actually fitted -------------
+ * Set to 0 when no potentiometer is on the board.
+ *
+ * This matters more than it looks. GPIO34 is input-only with no internal pull
+ * anywhere in the silicon, so an unfitted pot does not read zero - it floats,
+ * and the governor sees a herd size that wanders between 1 and 8 on its own.
+ * Every refusal it then produces is real, correctly reasoned, and based on a
+ * number nobody chose. That is the worst failure this rig can have, because
+ * it looks exactly like the system working.
+ *
+ * With HAVE_POT 0 the pin is never read. Group size comes from the serial
+ * console instead: type g5 and press enter. Say so when you demo it.
+ */
+#define HAVE_POT 0
+
+/* Set to 0 when the E-stop button is not fitted, or is wired in a way that
+ * reads permanently closed. Two legs on the same side of a tactile switch are
+ * already joined inside it, so that mistake grounds the pin forever and the
+ * governor is inhibited from the moment it boots.
+ *
+ * Turning this off does NOT remove the emergency stop - the console 'e'
+ * command still latches it, and every other veto is untouched. It removes a
+ * pin that is lying. But the rig must then never be described as having a
+ * wired safety interlock, so it says so at boot, every boot. */
+#define HAVE_ESTOP 0
+
+/* Set to 0 when no HC-SR04 is fitted or it returns no echo. Distance then
+ * comes from the console: type d80 for 80 cm. The governor cannot tell the
+ * difference, because it only ever sees a distance - which is exactly why you
+ * have to say out loud that the distance input is being typed. */
+#define HAVE_SENSOR 0
+
+/* Set to 1 when only two of the three status LEDs work. Measured on this
+ * board: GPIO26 and GPIO14 drive lamps, GPIO27 drives nothing. Rather than
+ * lose a state, escalation blinks the stop lamp instead of owning a colour.
+ * The reference build is still three lamps; this is one rig's reality. */
+#define TWO_LAMP_MODE 1
+
+/* Set to 1 when exactly one status LED works. Measured on this board: GPIO14
+ * lights, GPIO26 and GPIO27 do not.
+ *
+ * One lamp still carries three states, by rate rather than by colour: solid
+ * while emitting, a slow pulse while refusing, a fast flutter once it has
+ * given up and asked for a human. Dark means nothing is there.
+ *
+ * Solid-for-emitting is the right way round. This lamp is off almost all of
+ * the time, and that is the argument, not a limitation of it. */
+#define ONE_LAMP_MODE 0
+#if TWO_LAMP_MODE || ONE_LAMP_MODE
+/* Measured with count_lamp, each pin blinking its own number: the red lamp
+ * answers on GPIO27 and the green on GPIO14. GPIO26 has nothing attached.
+ *
+ * Worth recording why that was not obvious. The first mapping was taken while
+ * GPIO26 and GPIO27 were shorted together in one breadboard column, so driving
+ * either lit the single LED that existed, and GPIO26 looked like the red lamp.
+ * Once the short was fixed the reading was stale, and every later test drove a
+ * pin with nothing on it. Measurements taken through a fault do not survive
+ * the fix. */
+const int LAMP_GO   = 14;      // green: permitted
+const int LAMP_STOP = 27;      // red: refused, and blinking for escalated
+const int LAMP_ONE  = 14;
+#endif
 
 /* ---------------- LEDC ---------------- */
 const int      LEDC_CH   = 0;
@@ -99,6 +174,186 @@ static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
 #endif
 
 void emitStop();
+float pingOnceCm();
+void selfCheck();
+void consoleHelp();
+void consoleTick();
+void consoleRun(char *, uint8_t);
+
+/* ---------------- input conditioning ----------------
+ *
+ * Three noise sources, three specific demo failures:
+ *
+ *   button bounce   -> one glitch on a jumper latches the E-stop and the
+ *                      emitter is dead for the rest of the presentation
+ *   ADC noise       -> ESP32 ADC1 wanders by tens of counts while nothing
+ *                      moves; the group-size threshold is an integer boundary,
+ *                      so a still potentiometer flips PERMITTED / REFUSED
+ *   sonar outliers  -> a real HC-SR04 throws a bad ping regularly, off soft
+ *                      surfaces or while the previous burst is still ringing;
+ *                      one of those reads as 'target lost' and resets the run
+ *
+ * None of this changes a single governor rule. It only stops the inputs from
+ * lying to the rules.
+ */
+
+// A pin must agree with itself on this many consecutive passes to be believed.
+const uint8_t DEBOUNCE_PASSES = 4;
+const uint8_t GROUP_PASSES    = 3;
+const uint8_t ADC_SAMPLES     = 16;
+const uint8_t PING_GAP_MS     = 10;   // let the previous burst die down
+const uint8_t CONSOLE_IDLE_MS = 80;   // dispatch a command with no terminator
+
+const uint8_t B_PERSON = 0, B_NONTARGET = 1, B_ESTOP = 2, B_COUNT = 3;
+int     btnPin[B_COUNT];
+bool    btnStable[B_COUNT]    = {false, false, false};
+bool    btnCandidate[B_COUNT] = {false, false, false};
+uint8_t btnAgree[B_COUNT]     = {0, 0, 0};
+
+bool pressed(uint8_t i) {
+  bool raw = (digitalRead(btnPin[i]) == LOW);      // press-to-ground
+  if (raw != btnCandidate[i]) { btnCandidate[i] = raw; btnAgree[i] = 0; }
+  else if (btnAgree[i] < DEBOUNCE_PASSES) { btnAgree[i]++; }
+  if (btnAgree[i] >= DEBOUNCE_PASSES) btnStable[i] = btnCandidate[i];
+  return btnStable[i];
+}
+
+uint8_t groupStable = 1;
+uint8_t groupTyped  = 1;        // used when no pot is fitted
+
+uint8_t readGroup() {
+#if !HAVE_POT
+  return groupTyped;
+#else
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i < ADC_SAMPLES; i++) acc += analogRead(POT_GROUP);
+  long    span = map((long)(acc / ADC_SAMPLES), 0L, 4095L, 1L, 8L);
+  uint8_t want = (uint8_t)constrain(span, 1L, 8L);
+
+  static uint8_t candidate = 1, agree = 0;
+  if (want != candidate) { candidate = want; agree = 0; }
+  else if (agree < GROUP_PASSES) { agree++; }
+  if (agree >= GROUP_PASSES) groupStable = candidate;
+  return groupStable;
+#endif
+}
+
+/* ---------------- serial console ----------------
+ *
+ * Every physical input has a keyboard equivalent, for two reasons. A rig gets
+ * built with parts that did not arrive, and a rig gets demonstrated in a room
+ * where a jumper has shaken loose. Neither should cost you the argument, and
+ * the argument is the refusals.
+ *
+ * Typing a veto is not the same claim as pressing one, so the console says
+ * which it was in the log. Do not narrate a typed veto as a wired one.
+ */
+bool  typedPerson = false, typedNonTarget = false;
+float simDistanceCm = 999.0f;   // used when no sensor is fitted
+
+void consoleHelp() {
+  Serial.println("console: g1..g8 group size | p person veto | n dog/goat veto");
+  Serial.println("         e e-stop | r clear latches | ? this help");
+#if !HAVE_SENSOR
+  Serial.println("         d0..d400 distance in cm, e.g. d80 -> permitted");
+#endif
+#if !HAVE_POT
+  Serial.println("         no pot fitted, so group size comes from g1..g8");
+#endif
+}
+
+void consoleRun(char *line, uint8_t len) {
+  char cmd = line[0];
+  long arg = (len > 1) ? atol(line + 1) : -1;
+
+  if (cmd == 'g') {
+    if (arg >= 1 && arg <= 8) {
+      groupTyped = (uint8_t)arg;
+      Serial.printf("console: group size set to %u\n", groupTyped);
+    } else {
+      Serial.println("console: group size must be 1 to 8, e.g. g5");
+    }
+  } else if (cmd == 'd') {
+    if (arg >= 0 && arg <= 400) {
+      simDistanceCm = (float)arg;
+      Serial.printf("console: distance set to %ld cm (%.1f m scaled)\n",
+                    arg, arg / DESK_SCALE);
+    } else {
+      Serial.println("console: distance must be 0 to 400 cm, e.g. d80");
+    }
+  } else if (cmd == 'p') {
+    typedPerson = !typedPerson;
+    Serial.printf("console: PERSON veto %s (typed, not wired)\n",
+                  typedPerson ? "on" : "off");
+  } else if (cmd == 'n') {
+    typedNonTarget = !typedNonTarget;
+    Serial.printf("console: DOG/GOAT veto %s (typed, not wired)\n",
+                  typedNonTarget ? "on" : "off");
+  } else if (cmd == 'e') {
+    estopLatched = true;
+    Serial.println("console: E-STOP asserted");
+  } else if (cmd == 'r') {
+    /* Clear the typed vetoes too.
+     *
+     * They are toggles, so anything driving this console - a person or the web
+     * page - has no way to read their state, only to flip them. A reset that
+     * leaves them set means the driver's model and the board disagree from the
+     * first command onward, and every later toggle stays inverted. Reset has
+     * to mean reset, or it is just another source of drift. */
+    estopLatched = false;
+    doNotEmit = false;
+    typedPerson = false;
+    typedNonTarget = false;
+    exposureUsedMs = 0;
+    state = IDLE;
+    attempts = 0;
+    incidentStart = 0;
+    Serial.println("console: latches cleared");
+  } else if (cmd == '?') {
+    consoleHelp();
+  } else {
+    Serial.printf("console: unknown command '%s', try ?\n", line);
+  }
+}
+
+void consoleTick() {
+  /* Two ways a command gets here, because the Serial Monitor has a line-ending
+   * dropdown and it is not the operator's job to know about it.
+   *
+   * Set to "New Line" it sends p\n and the newline dispatches. Set to "No Line
+   * Ending" it sends a bare p and nothing follows, so a parser that waits for a
+   * terminator waits forever and the console looks broken. That is a real
+   * regression I shipped: character-by-character parsing handled the bare p,
+   * line buffering did not.
+   *
+   * So: dispatch on the newline if one arrives, and otherwise on a short
+   * silence. A human cannot type two commands 80 ms apart, and the monitor
+   * sends a whole line in one burst, so the silence is unambiguous. */
+  static char line[24];
+  static uint8_t n = 0;
+  static uint32_t lastChar = 0;
+
+  while (Serial.available() > 0) {
+    int c = Serial.read();
+    lastChar = millis();
+    if (c == '\\r') continue;
+    if (c != '\\n') {
+      if (n < sizeof(line) - 1) line[n++] = (char)c;
+      continue;
+    }
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    if (len > 0) consoleRun(line, len);
+  }
+
+  if (n > 0 && (millis() - lastChar) > CONSOLE_IDLE_MS) {
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    consoleRun(line, len);
+  }
+}
 
 void setup() {
   pinMode(PIN_TRIG, OUTPUT);
@@ -110,6 +365,9 @@ void setup() {
   pinMode(BTN_PERSON, INPUT_PULLUP);
   pinMode(BTN_NONTARGET, INPUT_PULLUP);
   pinMode(BTN_ESTOP, INPUT);        // GPIO35 has no internal pull-up: add 10k to 3V3
+  btnPin[B_PERSON]    = BTN_PERSON;
+  btnPin[B_NONTARGET] = BTN_NONTARGET;
+  btnPin[B_ESTOP]     = BTN_ESTOP;
 
   emitAttach();
   emitDuty(0);
@@ -130,6 +388,95 @@ void setup() {
   Serial.printf("max group        %d\n", MAX_GROUP);
   Serial.println("timers compressed for the demo; shipped values shown first");
   Serial.println("NO calibrated mic attached: this rig makes no dB claim");
+  Serial.println();
+  selfCheck();
+  consoleHelp();
+  Serial.println();
+}
+
+/* Power-on self check.
+ *
+ * A governor made of refusals cannot tell you it is miswired: a floating
+ * E-stop latches, a dead sensor reads as "nothing there", and both look
+ * exactly like the system working correctly and declining to emit. Every
+ * silent failure mode in this rig presents as a deliberate refusal, so the
+ * inputs get examined once at boot, before the logic can hide behind them. */
+void selfCheck() {
+  Serial.println("power-on self check");
+
+#if HAVE_ESTOP
+  uint8_t lows = 0;
+  for (uint8_t i = 0; i < 40; i++) {
+    if (digitalRead(BTN_ESTOP) == LOW) lows++;
+    delay(5);
+  }
+  if (lows == 0) {
+    Serial.println("  E-stop input    OK, held high");
+  } else if (lows == 40) {
+    Serial.println("  E-stop input    STUCK LOW - button held closed, or both its "
+                   "wires are on the same side of the switch");
+  } else {
+    Serial.printf("  E-stop input    FLOATING (%u of 40 samples low) - the 10k "
+                  "pull-up to 3V3 is not connected\n", lows);
+  }
+#else
+  const uint8_t lows = 0;
+  Serial.println("  E-stop input    NOT FITTED - the wired stop is disabled; "
+                 "console 'e' still latches");
+#endif
+
+#if HAVE_SENSOR
+  uint8_t echoes = 0;
+  for (uint8_t i = 0; i < 5; i++) {
+    if (pingOnceCm() > 0) echoes++;
+    delay(60);
+  }
+  if (echoes > 0) {
+    Serial.printf("  distance sensor OK, %u of 5 pings returned\n", echoes);
+  } else {
+    Serial.println("  distance sensor NO ECHO - check VCC is on VIN/5V not 3V3, "
+                   "and that TRIG and ECHO are not swapped");
+  }
+#else
+  const uint8_t echoes = 1;
+  Serial.println("  distance sensor NOT FITTED - distance comes from the "
+                 "console, type d80");
+#endif
+
+#if !HAVE_POT
+  Serial.println("  group knob      NOT FITTED - group size comes from the "
+                 "console, type g5");
+#else
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i < 16; i++) acc += analogRead(POT_GROUP);
+  Serial.printf("  group knob      reads %lu of 4095\n",
+                (unsigned long)(acc / 16));
+#endif
+
+  if (lows > 0 || echoes == 0) {
+    Serial.println("  ^ fix the above before reading anything into a refusal");
+  }
+#if !HAVE_ESTOP || !HAVE_SENSOR || !HAVE_POT
+  Serial.println();
+  Serial.println("  DECLARE THIS WHEN YOU DEMONSTRATE:");
+#if !HAVE_SENSOR
+  Serial.println("    the distance input is typed, not sensed");
+#endif
+#if !HAVE_POT
+  Serial.println("    the group size is typed, not read from a knob");
+#endif
+#if !HAVE_ESTOP
+  Serial.println("    the emergency stop is a console command, not a wired button");
+#endif
+#if ONE_LAMP_MODE
+  Serial.println("    one lamp, not three: solid means emitting, a slow pulse "
+                 "means refused, a fast flutter means it gave up");
+#elif TWO_LAMP_MODE
+  Serial.println("    two lamps, not three: green permits, red refuses, "
+                 "red blinking is escalation");
+#endif
+  Serial.println("    the governor rules below are unchanged and are doing the deciding");
+#endif
   Serial.println();
 }
 
@@ -171,7 +518,7 @@ void emitStop(const char *why) {
   emitDuty(0);
 }
 
-float readRangeCm() {
+float pingOnceCm() {
   digitalWrite(PIN_TRIG, LOW);  delayMicroseconds(2);
   digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
@@ -180,16 +527,63 @@ float readRangeCm() {
   return us / 58.0f;
 }
 
+/* Median of three. One bad ping cannot move the answer, and the no-echo case
+ * still wins when two of three agree on it - which is the behaviour we want,
+ * because 'nothing there' has to stay easy to conclude. */
+float readRangeCm() {
+  float a = pingOnceCm(); delay(PING_GAP_MS);
+  float b = pingOnceCm(); delay(PING_GAP_MS);
+  float c = pingOnceCm();
+  float hi = max(a, max(b, c));
+  float lo = min(a, min(b, c));
+  return a + b + c - hi - lo;
+}
+
+#if ONE_LAMP_MODE
+/* One lamp, three states, told apart by rate. */
+void leds(bool p, bool r, bool e) {
+  uint32_t ms = millis();
+  bool on;
+  if (p)      on = true;                        // emitting: solid
+  else if (e) on = ((ms / 120) % 2) == 0;       // escalated: fast flutter
+  else if (r) on = ((ms / 500) % 2) == 0;       // refusing: slow pulse
+  else        on = false;                       // nothing detected
+  digitalWrite(LAMP_ONE, on);
+}
+#elif TWO_LAMP_MODE
+/* Two working lamps instead of three.
+ *
+ * Three states, two lights, so escalation has to be distinguishable from a
+ * refusal by something other than colour: it blinks. */
+void leds(bool p, bool r, bool e) {
+  digitalWrite(LAMP_GO, p);
+  bool blink = ((millis() / 250) % 2) == 0;
+  digitalWrite(LAMP_STOP, e ? blink : r);
+}
+#else
 void leds(bool p, bool r, bool e) {
   digitalWrite(LED_PERMIT, p);
   digitalWrite(LED_REFUSE, r);
   digitalWrite(LED_ESCALATE, e);
 }
+#endif
 
 void loop() {
   uint32_t now = millis();
 
-  if (digitalRead(BTN_ESTOP) == LOW) estopLatched = true;
+  /* Sample every input on every pass, before any early return. A debounce
+   * counter that only advances while a target is present is worse than none:
+   * a veto button already held down when the animal walks in would need four
+   * more passes to be believed, and the governor would permit emission in the
+   * gap. Safety inputs must be settled before they are needed, not after. */
+  consoleTick();
+  bool person    = pressed(B_PERSON)    || typedPerson;
+  bool nonTarget = pressed(B_NONTARGET) || typedNonTarget;
+  uint8_t group  = readGroup();
+
+#if HAVE_ESTOP
+  if (pressed(B_ESTOP)) estopLatched = true;
+#endif
   if (estopLatched) {
     emitStop("E-STOP");
     state = INHIBITED;
@@ -204,12 +598,13 @@ void loop() {
 
   if (now - lastBeat > 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
 
+#if HAVE_SENSOR
   float cm = readRangeCm();
+#else
+  float cm = simDistanceCm;
+#endif
   bool  seen = (cm > 0 && cm < 200);
   float metres = seen ? (cm / DESK_SCALE) : 999.0f;
-  bool  person    = (digitalRead(BTN_PERSON) == LOW);
-  bool  nonTarget = (digitalRead(BTN_NONTARGET) == LOW);
-  uint8_t group   = map(analogRead(POT_GROUP), 0, 4095, 1, 8);
 
   if (state == EMITTING && (now - emitStartedAt) >= scaled(MAX_ACTIVATION_MS)) {
     emitStop("WATCHDOG max activation");

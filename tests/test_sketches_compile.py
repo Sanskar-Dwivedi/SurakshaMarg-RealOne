@@ -81,9 +81,12 @@ def test_esp32_sketch_uses_no_raw_ledc_call_outside_the_shim():
     assert not outside, "raw LEDC calls outside the shim:\n" + "\n".join(outside)
 
 
+SIMPLE_COPY = ROOT / "hardware" / "wokwi_simple" / "sketch.ino"
+
+
 @pytest.mark.parametrize("original,copy",
-                         [(ESP, ESP_COPY), (UNO, UNO_COPY)],
-                         ids=["esp32", "uno"])
+                         [(ESP, ESP_COPY), (UNO, UNO_COPY), (ESP, SIMPLE_COPY)],
+                         ids=["esp32", "uno", "esp32-simple"])
 def test_wokwi_sketch_copies_are_current(original: Path, copy: Path):
     """
     Wokwi wants the file called sketch.ino. Those copies must not go stale, or

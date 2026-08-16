@@ -1,0 +1,971 @@
+<title>GauKavach - Wokwi build manual</title>
+<style>
+:root{--ground:#EDF0F3;--surface:#FFFFFF;--ink:#0F141A;--body:#28323C;--muted:#5D6B79;
+--faint:#8695A3;--line:#D2DAE1;--accent:#0E7C86;--ok:#1C7A4B;--ok-bg:#E2F1E8;
+--warn:#93670A;--warn-bg:#F8EFD8;--crit:#A9291F;--crit-bg:#F8E4E2;--surface-2:#F5F8FA;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#0C1116;
+--surface:#131A21;--ink:#E9EEF3;--body:#C3CFD9;--muted:#8FA0AE;--faint:#6B7C8A;
+--line:#212C36;--accent:#40B9C2;--ok:#5FBF8A;--ok-bg:#12291E;--warn:#D9A63C;
+--warn-bg:#2C2314;--crit:#E0776C;--crit-bg:#2E1815;--surface-2:#182028;}}
+:root[data-theme="dark"]{--ground:#0C1116;--surface:#131A21;--ink:#E9EEF3;
+--body:#C3CFD9;--muted:#8FA0AE;--faint:#6B7C8A;--line:#212C36;--accent:#40B9C2;
+--ok:#5FBF8A;--ok-bg:#12291E;--warn:#D9A63C;--warn-bg:#2C2314;--crit:#E0776C;
+--crit-bg:#2E1815;--surface-2:#182028;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15.5px;line-height:1.62}
+h1,h2{font-family:Charter,"Bitstream Charter",Georgia,serif;color:var(--ink);margin:0;text-wrap:balance}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px 80px}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:30px 0 26px;margin-bottom:26px}
+.eyebrow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.14em;
+text-transform:uppercase;color:var(--accent)}
+h1{font-size:32px;letter-spacing:-.015em;margin-top:6px}
+.lede{max-width:72ch;margin-top:12px;color:var(--muted)}
+.rail{display:flex;gap:6px;margin:22px 0 0;flex-wrap:wrap}
+.rail a{flex:1 1 0;min-width:60px;text-decoration:none;border:1px solid var(--line);
+background:var(--surface);padding:8px 4px;text-align:center;
+font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--muted)}
+.rail a b{display:block;font-size:16px;color:var(--ink);margin-bottom:2px}
+.rail a:hover{border-color:var(--accent);color:var(--accent)}
+.step{background:var(--surface);border:1px solid var(--line);margin-top:30px;
+overflow:hidden;scroll-margin-top:14px}
+.shead{display:flex;gap:18px;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line)}
+.num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:19px;font-weight:700;color:#fff;
+background:var(--accent);width:44px;height:44px;display:grid;place-items:center;flex:none;border-radius:50%}
+.num.crit{background:var(--crit)} .num.ok{background:var(--ok)} .num.warn{background:var(--warn)}
+h2{font-size:23px}
+.body{padding:20px 24px 24px}
+ol{margin:0;padding-left:24px;max-width:82ch} ol li{margin-bottom:9px}
+ol li::marker{color:var(--accent);font-weight:700}
+.pic{margin-top:18px;border:1px solid var(--line);background:#fff;overflow-x:auto}
+.pic svg{display:block;min-width:700px}
+.note{margin-top:16px;padding:14px 17px;border-left:3px solid var(--warn);
+background:var(--warn-bg);font-size:14px;max-width:90ch}
+.note.crit{border-left-color:var(--crit);background:var(--crit-bg)}
+.note b{color:var(--ink)}
+.fast{border:2px solid var(--accent);background:var(--surface);padding:20px 24px;
+margin-top:24px}
+.fast h2{font-size:24px;margin-bottom:4px}
+.fast .tag{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;
+letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.clicks{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+gap:12px;margin-top:16px}
+.click{border:1px solid var(--line);background:var(--surface-2);padding:12px 14px}
+.click b{display:block;color:var(--ink);font-size:15px;margin-bottom:3px}
+.click span{font-size:13px;color:var(--muted)}
+.click i{font-family:ui-monospace,Menlo,Consolas,monospace;font-style:normal;
+color:var(--accent);font-size:11px;letter-spacing:.08em}
+.cp{position:relative;margin-top:14px}
+.cp button{position:absolute;top:10px;right:10px;z-index:2;
+font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.06em;
+text-transform:uppercase;background:#1F2A33;color:#CFE0E4;border:1px solid #3A4954;
+padding:6px 12px;cursor:pointer}
+.cp button:hover{background:#2A3A45;color:#fff}
+.cp button.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.cp h3{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 6px}
+.callout{border:1px solid var(--line);border-left:3px solid var(--accent);
+background:var(--surface);padding:16px 20px;margin-top:22px}
+.callout .lbl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;
+letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px}
+.callout p{margin:0;max-width:80ch} .callout p+p{margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:14px}
+th{text-align:left;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;
+letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:400;
+padding:10px 13px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+td{padding:9px 13px;border-bottom:1px solid var(--line)}
+td.w{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--ink);white-space:nowrap}
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--surface);margin-top:14px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;
+background:var(--surface-2);padding:1px 5px;border:1px solid var(--line)}
+pre{margin:14px 0 0;padding:16px 18px;background:#10161C;color:#D7E1EA;overflow-x:auto;
+font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;
+border:1px solid var(--line);max-height:460px}
+pre.short{max-height:300px}
+details{margin-top:16px;border:1px solid var(--line);background:var(--surface-2);padding:12px 16px}
+summary{cursor:pointer;font-weight:600;color:var(--ink)}
+@media print{body{background:#fff} .step{break-inside:avoid} .rail{display:none}}
+</style>
+<header><div class="wrap">
+<div class="eyebrow">Wokwi build manual</div>
+<h1>Build the simulation by hand &mdash; no breadboard</h1>
+<p class="lede">Nine steps, about fifteen minutes. Add one part, wire it, move on.
+Every wire in this manual is read out of the project's own diagram file, so the
+instructions cannot describe a circuit that does not exist. If you would rather
+not click, step 2's shortcut drops the whole thing in at once.</p>
+<div class="rail"><a href="#w1"><b>1</b>Open</a><a href="#w2"><b>2</b>Paste</a><a href="#w3"><b>3</b>Three</a><a href="#w4"><b>4</b>The</a><a href="#w5"><b>5</b>The</a><a href="#w6"><b>6</b>The</a><a href="#w7"><b>7</b>Group-size</a><a href="#w8"><b>8</b>The</a><a href="#w9"><b>9</b>Press</a></div>
+</div></header>
+<div class="wrap">
+
+<div class="fast">
+<div class="tag">Fastest route &mdash; about a minute, no wiring</div>
+<h2>Paste two things and press play</h2>
+<p style="max-width:74ch;margin-top:8px">You do not have to understand Wokwi's
+editor to run this. Wokwi keeps the circuit in a text file, so pasting that file
+builds every part and every wire for you. Nothing to drag.</p>
+<div class="clicks">
+<div class="click"><b>1. Open</b><span>Go to <i>wokwi.com/projects/new/esp32</i>
+&mdash; no account needed to run it.</span></div>
+<div class="click"><b>2. diagram.json</b><span>Tab above the code, next to
+<i>sketch.ino</i>. Click it, select all, paste block B.</span></div>
+<div class="click"><b>3. sketch.ino</b><span>Back to the first tab. Select all,
+paste block A.</span></div>
+<div class="click"><b>4. Play</b><span>The green triangle, top left of the
+canvas. The serial pane opens underneath.</span></div>
+</div>
+<div class="cp"><h3>Block A &mdash; paste into sketch.ino</h3>
+<button data-copy="blockA">Copy</button><pre id="blockA">/*
+ * GauKavach - bench governor, ESP32
+ * ---------------------------------
+ * Same rule set as the Uno sketch, plus the one thing an Uno physically
+ * cannot do: a RAMPED burst envelope.
+ *
+ * Arduino tone() emits a hard-gated square wave. Our own spectrum analysis
+ * (gaukavach spectrum) says that is the wrong waveform: the rectangular gate
+ * splatters broadband switching energy into the audible band, so the device
+ * clicks at every activation even though the carrier is ultrasonic. OSHA
+ * documents exactly this failure mode.
+ *
+ * The ESP32&#x27;s LEDC peripheral gives independent control of frequency and duty,
+ * so the duty cycle can be ramped up and down with a raised-cosine profile.
+ * That is the hardware expression of emitter.py&#x27;s _raised_cosine_envelope().
+ *
+ * Honest scope, unchanged from the Uno sketch:
+ *   - no calibrated microphone is attached, so this rig makes NO dB claim
+ *   - duty ramping shapes the drive envelope; it is not a substitute for
+ *     measuring the acoustic output of a real transducer
+ *   - a 40 kHz ranging element is the wrong part (above the 35 kHz cattle
+ *     audiogram endpoint) and stands in for the signal chain only
+ *
+ * ARDUINO IDE SETTINGS
+ *   Tools &gt; Board            ESP32 Arduino &gt; ESP32 Dev Module
+ *   Tools &gt; Upload Speed     921600  (drop to 115200 if uploads fail)
+ *   Tools &gt; Port             whatever COM port appears when the board is plugged in
+ *   No libraries to install: everything used here ships with the ESP32 core.
+ * If the port never appears, it is the CP2102 / CH340 USB-serial driver, not
+ * the sketch. If upload stalls at &quot;Connecting...&quot;, hold BOOT while it starts.
+ *
+ * The LEDC API changed between Arduino-ESP32 core 2.x and 3.x: ledcSetup() and
+ * ledcAttachPin() were removed, and ledcWrite() now takes a PIN rather than a
+ * channel. Both Wokwi and this machine&#x27;s IDE are on core 3.x; the wrappers
+ * below still cover 2.x so the sketch survives an older install elsewhere.
+ *
+ * REAL HARDWARE vs THE SIMULATOR
+ * A simulator hands you a clean sensor reading, a clean ADC and a bounce-free
+ * button. A breadboard hands you none of those, and each one has a specific
+ * way of ruining a live demo, so each is conditioned below: see &#x27;input
+ * conditioning&#x27;. The governor logic itself is untouched - the whole point is
+ * that the rules are the same everywhere they are stated.
+ */
+
+/* ---------------- pins ---------------- */
+const int PIN_TRIG      = 13;
+const int PIN_ECHO      = 39;   // VN. NOT 12: GPIO12 is a strapping pin (MTDI)
+const int PIN_EMIT      = 25;   // LEDC output -&gt; 220R -&gt; transistor -&gt; transducer
+
+const int LED_PERMIT    = 26;   // green
+const int LED_REFUSE    = 27;   // red
+const int LED_ESCALATE  = 14;   // amber
+const int LED_ARMED     = 2;    // on-board blue
+
+const int BTN_PERSON    = 32;
+const int BTN_NONTARGET = 33;
+const int BTN_ESTOP     = 35;   // input-only pin, needs an external pull-up
+
+/* Pin choices avoid the ESP32 strapping pins 0, 2, 5, 12 and 15, which are
+ * sampled at reset. GPIO2 is the exception: it is the on-board LED, driven as
+ * an output only, which is the standard and safe use of it. */
+const int POT_GROUP     = 34;   // ADC1, input-only
+
+/* ---------------- LEDC ---------------- */
+const int      LEDC_CH   = 0;
+const int      LEDC_RES  = 8;          // 8-bit duty, 0..255
+const uint32_t CARRIER_HZ = 25000;     // inside the documented 22-30 kHz band
+const uint8_t  DUTY_PEAK = 128;        // 50% = maximum drive for a square carrier
+const uint16_t RAMP_MS   = 25;         // raised-cosine rise and fall
+
+/* ------------- governor limits, mirroring evidence.py ------------- */
+const uint8_t  MAX_GROUP         = 3;
+const uint32_t MAX_ACTIVATION_MS = 6000;
+const uint32_t MIN_SILENCE_MS    = 20000;
+const uint32_t DAILY_BUDGET_MS   = 120000;
+const uint32_t ESCALATE_AFTER_MS = 25000;
+const uint8_t  MAX_ATTEMPTS      = 3;
+/* Live demos cannot wait 20 s between bursts, so the long timers are divided
+ * by this and the true values are printed at boot - the compression is stated,
+ * not hidden. Set to 4, not 10: at 10x, escalation fires 2.5 s after detection,
+ * which is quicker than you can reach for a button, so every veto you try to
+ * demonstrate has already gone to amber. Verified in the simulator. */
+const uint16_t DEMO_SPEED        = 4;
+
+const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
+const float RANGE_MAX_M = 42.8;
+const float LINE_M      = 12.0;
+
+enum State { IDLE, TRACKING, EMITTING, COOLDOWN, ESCALATED, INHIBITED };
+State state = IDLE;
+
+uint32_t emitStartedAt = 0, lastEmissionEnd = 0, exposureUsedMs = 0;
+uint32_t incidentStart = 0, lastBeat = 0, lastPrint = 0;
+uint8_t  attempts = 0;
+bool     doNotEmit = false, estopLatched = false, armedLed = false;
+
+uint32_t scaled(uint32_t ms) { return ms / DEMO_SPEED; }
+
+/* ---- LEDC portability shim: core 2.x and 3.x ----
+ * ESP_ARDUINO_VERSION_MAJOR is undefined on very old cores, which the
+ * preprocessor treats as 0, so the 2.x branch is the safe default. */
+#if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
+static inline void emitAttach()            { ledcAttach(PIN_EMIT, CARRIER_HZ, LEDC_RES); }
+static inline void emitDuty(uint32_t duty) { ledcWrite(PIN_EMIT, duty); }
+#else
+static inline void emitAttach() {
+  ledcSetup(LEDC_CH, CARRIER_HZ, LEDC_RES);
+  ledcAttachPin(PIN_EMIT, LEDC_CH);
+}
+static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
+#endif
+
+void emitStop();
+
+/* ---------------- input conditioning ----------------
+ *
+ * Three noise sources, three specific demo failures:
+ *
+ *   button bounce   -&gt; one glitch on a jumper latches the E-stop and the
+ *                      emitter is dead for the rest of the presentation
+ *   ADC noise       -&gt; ESP32 ADC1 wanders by tens of counts while nothing
+ *                      moves; the group-size threshold is an integer boundary,
+ *                      so a still potentiometer flips PERMITTED / REFUSED
+ *   sonar outliers  -&gt; a real HC-SR04 throws a bad ping regularly, off soft
+ *                      surfaces or while the previous burst is still ringing;
+ *                      one of those reads as &#x27;target lost&#x27; and resets the run
+ *
+ * None of this changes a single governor rule. It only stops the inputs from
+ * lying to the rules.
+ */
+
+// A pin must agree with itself on this many consecutive passes to be believed.
+const uint8_t DEBOUNCE_PASSES = 4;
+const uint8_t GROUP_PASSES    = 3;
+const uint8_t ADC_SAMPLES     = 16;
+const uint8_t PING_GAP_MS     = 10;   // let the previous burst die down
+
+const uint8_t B_PERSON = 0, B_NONTARGET = 1, B_ESTOP = 2, B_COUNT = 3;
+int     btnPin[B_COUNT];
+bool    btnStable[B_COUNT]    = {false, false, false};
+bool    btnCandidate[B_COUNT] = {false, false, false};
+uint8_t btnAgree[B_COUNT]     = {0, 0, 0};
+
+bool pressed(uint8_t i) {
+  bool raw = (digitalRead(btnPin[i]) == LOW);      // press-to-ground
+  if (raw != btnCandidate[i]) { btnCandidate[i] = raw; btnAgree[i] = 0; }
+  else if (btnAgree[i] &lt; DEBOUNCE_PASSES) { btnAgree[i]++; }
+  if (btnAgree[i] &gt;= DEBOUNCE_PASSES) btnStable[i] = btnCandidate[i];
+  return btnStable[i];
+}
+
+uint8_t groupStable = 1;
+
+uint8_t readGroup() {
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i &lt; ADC_SAMPLES; i++) acc += analogRead(POT_GROUP);
+  long    span = map((long)(acc / ADC_SAMPLES), 0L, 4095L, 1L, 8L);
+  uint8_t want = (uint8_t)constrain(span, 1L, 8L);
+
+  static uint8_t candidate = 1, agree = 0;
+  if (want != candidate) { candidate = want; agree = 0; }
+  else if (agree &lt; GROUP_PASSES) { agree++; }
+  if (agree &gt;= GROUP_PASSES) groupStable = candidate;
+  return groupStable;
+}
+
+void setup() {
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+  pinMode(LED_PERMIT, OUTPUT);
+  pinMode(LED_REFUSE, OUTPUT);
+  pinMode(LED_ESCALATE, OUTPUT);
+  pinMode(LED_ARMED, OUTPUT);
+  pinMode(BTN_PERSON, INPUT_PULLUP);
+  pinMode(BTN_NONTARGET, INPUT_PULLUP);
+  pinMode(BTN_ESTOP, INPUT);        // GPIO35 has no internal pull-up: add 10k to 3V3
+  btnPin[B_PERSON]    = BTN_PERSON;
+  btnPin[B_NONTARGET] = BTN_NONTARGET;
+  btnPin[B_ESTOP]     = BTN_ESTOP;
+
+  emitAttach();
+  emitDuty(0);
+
+  Serial.begin(115200);
+  delay(200);
+  Serial.println();
+  Serial.println(&quot;GauKavach bench governor - ESP32&quot;);
+  Serial.println(&quot;========================================&quot;);
+  Serial.printf(&quot;carrier          %lu Hz, %d-bit duty, raised-cosine %d ms ramp\n&quot;,
+                (unsigned long)CARRIER_HZ, LEDC_RES, RAMP_MS);
+  Serial.printf(&quot;max activation   %.1f s   (demo %.1f s)\n&quot;,
+                MAX_ACTIVATION_MS / 1000.0, scaled(MAX_ACTIVATION_MS) / 1000.0);
+  Serial.printf(&quot;quiet period     %.1f s   (demo %.1f s)\n&quot;,
+                MIN_SILENCE_MS / 1000.0, scaled(MIN_SILENCE_MS) / 1000.0);
+  Serial.printf(&quot;daily budget     %.1f s   (demo %.1f s)\n&quot;,
+                DAILY_BUDGET_MS / 1000.0, scaled(DAILY_BUDGET_MS) / 1000.0);
+  Serial.printf(&quot;max group        %d\n&quot;, MAX_GROUP);
+  Serial.println(&quot;timers compressed for the demo; shipped values shown first&quot;);
+  Serial.println(&quot;NO calibrated mic attached: this rig makes no dB claim&quot;);
+  Serial.println();
+}
+
+/* Raised-cosine rise. Blocking for RAMP_MS, which is acceptable here because
+ * nothing else needs servicing during a 25 ms envelope, and it keeps the shape
+ * identical to emitter.py rather than approximated by a scheduler. */
+void emitStart() {
+  for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
+    float x = (float)t / RAMP_MS;                 // 0..1
+    float e = 0.5f * (1.0f - cosf(PI * x));       // raised cosine
+    emitDuty((uint32_t)(DUTY_PEAK * e));
+    delay(1);
+  }
+  emitDuty(DUTY_PEAK);
+}
+
+void emitFade() {
+  for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
+    float x = (float)t / RAMP_MS;
+    float e = 0.5f * (1.0f + cosf(PI * x));       // mirror of the rise
+    emitDuty((uint32_t)(DUTY_PEAK * e));
+    delay(1);
+  }
+  emitDuty(0);
+}
+
+void emitStop(const char *why) {
+  if (state == EMITTING) {
+    emitFade();
+    uint32_t dur = millis() - emitStartedAt;
+    exposureUsedMs += dur;
+    lastEmissionEnd = millis();
+    Serial.printf(&quot;  emission ended after %lu ms - %s\n&quot;, (unsigned long)dur, why);
+    if (exposureUsedMs &gt;= scaled(DAILY_BUDGET_MS)) {
+      doNotEmit = true;
+      Serial.println(&quot;  DAILY EXPOSURE BUDGET EXHAUSTED -&gt; do-not-emit latched&quot;);
+    }
+  }
+  emitDuty(0);
+}
+
+float pingOnceCm() {
+  digitalWrite(PIN_TRIG, LOW);  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  unsigned long us = pulseIn(PIN_ECHO, HIGH, 25000UL);
+  if (us == 0) return -1.0f;            // no echo != &quot;animal is adjacent&quot;
+  return us / 58.0f;
+}
+
+/* Median of three. One bad ping cannot move the answer, and the no-echo case
+ * still wins when two of three agree on it - which is the behaviour we want,
+ * because &#x27;nothing there&#x27; has to stay easy to conclude. */
+float readRangeCm() {
+  float a = pingOnceCm(); delay(PING_GAP_MS);
+  float b = pingOnceCm(); delay(PING_GAP_MS);
+  float c = pingOnceCm();
+  float hi = max(a, max(b, c));
+  float lo = min(a, min(b, c));
+  return a + b + c - hi - lo;
+}
+
+void leds(bool p, bool r, bool e) {
+  digitalWrite(LED_PERMIT, p);
+  digitalWrite(LED_REFUSE, r);
+  digitalWrite(LED_ESCALATE, e);
+}
+
+void loop() {
+  uint32_t now = millis();
+
+  /* Sample every input on every pass, before any early return. A debounce
+   * counter that only advances while a target is present is worse than none:
+   * a veto button already held down when the animal walks in would need four
+   * more passes to be believed, and the governor would permit emission in the
+   * gap. Safety inputs must be settled before they are needed, not after. */
+  bool person    = pressed(B_PERSON);
+  bool nonTarget = pressed(B_NONTARGET);
+  uint8_t group  = readGroup();
+
+  if (pressed(B_ESTOP)) estopLatched = true;
+  if (estopLatched) {
+    emitStop(&quot;E-STOP&quot;);
+    state = INHIBITED;
+    leds(false, true, false);
+    digitalWrite(LED_ARMED, LOW);
+    if (now - lastPrint &gt; 1000) {
+      Serial.println(&quot;E-STOP LATCHED - emitter dead until reset&quot;);
+      lastPrint = now;
+    }
+    return;
+  }
+
+  if (now - lastBeat &gt; 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
+
+  float cm = readRangeCm();
+  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; 200);
+  float metres = seen ? (cm / DESK_SCALE) : 999.0f;
+
+  if (state == EMITTING &amp;&amp; (now - emitStartedAt) &gt;= scaled(MAX_ACTIVATION_MS)) {
+    emitStop(&quot;WATCHDOG max activation&quot;);
+    state = COOLDOWN;
+  }
+
+  if (!seen) {
+    if (state == EMITTING) emitStop(&quot;target lost&quot;);
+    if (state != INHIBITED) state = IDLE;
+    attempts = 0; incidentStart = 0;
+    leds(false, false, false);
+    return;
+  }
+
+  if (incidentStart == 0) {
+    incidentStart = now;
+    Serial.printf(&quot;DETECTION at %.1f m (scaled)\n&quot;, metres);
+  }
+
+  const char *deny = nullptr;
+  if (doNotEmit)                     deny = &quot;animal is on the do-not-emit list&quot;;
+  else if (person)                   deny = &quot;a person is inside the exposure cone&quot;;
+  else if (nonTarget)                deny = &quot;a non-target species is inside the cone&quot;;
+  else if (group &gt; MAX_GROUP)        deny = &quot;group large enough that a startle could cascade&quot;;
+  else if (metres &gt; RANGE_MAX_M)     deny = &quot;beyond the acoustic envelope&quot;;
+  else if (metres &lt;= LINE_M)         deny = &quot;already at the carriageway - fleeing would cross it&quot;;
+  else if (state == COOLDOWN &amp;&amp;
+           (now - lastEmissionEnd) &lt; scaled(MIN_SILENCE_MS))
+                                     deny = &quot;enforced quiet period&quot;;
+
+  bool timedOut = (now - incidentStart) &gt; scaled(ESCALATE_AFTER_MS);
+  if (state != EMITTING &amp;&amp; (attempts &gt;= MAX_ATTEMPTS || timedOut)) {
+    if (state != ESCALATED) {
+      emitStop(&quot;escalating&quot;);
+      Serial.println(&quot;  ESCALATED -&gt; traffic warning + human dispatch&quot;);
+      Serial.println(&quot;  (acoustic cues are not stock-proof; the system stops)&quot;);
+      state = ESCALATED;
+    }
+    leds(false, false, true);
+    return;
+  }
+
+  if (deny != nullptr) {
+    if (state == EMITTING) emitStop(deny);
+    state = (state == COOLDOWN) ? COOLDOWN : TRACKING;
+    leds(false, true, false);
+    if (now - lastPrint &gt; 800) {
+      Serial.printf(&quot;REFUSED @ %.1f m  group=%d  -&gt; %s\n&quot;, metres, group, deny);
+      lastPrint = now;
+    }
+    return;
+  }
+
+  if (state != EMITTING) {
+    state = EMITTING;
+    emitStartedAt = millis();
+    attempts++;
+    Serial.printf(&quot;PERMITTED @ %.1f m  attempt %d/%d  carrier %.1f kHz  ramped %d ms\n&quot;,
+                  metres, attempts, MAX_ATTEMPTS, CARRIER_HZ / 1000.0, RAMP_MS);
+    Serial.printf(&quot;  budget used %lu / %lu ms\n&quot;,
+                  (unsigned long)exposureUsedMs, (unsigned long)scaled(DAILY_BUDGET_MS));
+    emitStart();
+  }
+  leds(true, false, false);
+}
+</pre></div>
+<div class="cp"><h3>Block B &mdash; paste into diagram.json</h3>
+<button data-copy="blockB">Copy</button><pre class="short" id="blockB">{
+  &quot;version&quot;: 1,
+  &quot;author&quot;: &quot;GauKavach&quot;,
+  &quot;editor&quot;: &quot;wokwi&quot;,
+  &quot;parts&quot;: [
+    { &quot;type&quot;: &quot;board-esp32-devkit-c-v4&quot;, &quot;id&quot;: &quot;esp&quot;, &quot;top&quot;: 0, &quot;left&quot;: 0, &quot;attrs&quot;: {} },
+    { &quot;type&quot;: &quot;wokwi-hc-sr04&quot;, &quot;id&quot;: &quot;sr04&quot;, &quot;top&quot;: -180, &quot;left&quot;: 200,
+      &quot;attrs&quot;: { &quot;distance&quot;: &quot;80&quot; } },
+    { &quot;type&quot;: &quot;wokwi-led&quot;, &quot;id&quot;: &quot;ledGreen&quot;, &quot;top&quot;: -60, &quot;left&quot;: 230,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;green&quot;, &quot;label&quot;: &quot;PERMIT&quot; } },
+    { &quot;type&quot;: &quot;wokwi-led&quot;, &quot;id&quot;: &quot;ledRed&quot;, &quot;top&quot;: -60, &quot;left&quot;: 300,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;red&quot;, &quot;label&quot;: &quot;REFUSE&quot; } },
+    { &quot;type&quot;: &quot;wokwi-led&quot;, &quot;id&quot;: &quot;ledAmber&quot;, &quot;top&quot;: -60, &quot;left&quot;: 370,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;orange&quot;, &quot;label&quot;: &quot;ESCALATE&quot; } },
+    { &quot;type&quot;: &quot;wokwi-buzzer&quot;, &quot;id&quot;: &quot;bz&quot;, &quot;top&quot;: -60, &quot;left&quot;: 440,
+      &quot;attrs&quot;: { &quot;volume&quot;: &quot;0.1&quot; } },
+    { &quot;type&quot;: &quot;wokwi-pushbutton&quot;, &quot;id&quot;: &quot;btnPerson&quot;, &quot;top&quot;: 90, &quot;left&quot;: 200,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;blue&quot;, &quot;label&quot;: &quot;PERSON&quot; } },
+    { &quot;type&quot;: &quot;wokwi-pushbutton&quot;, &quot;id&quot;: &quot;btnNonTarget&quot;, &quot;top&quot;: 170, &quot;left&quot;: 200,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;yellow&quot;, &quot;label&quot;: &quot;DOG / GOAT&quot; } },
+    { &quot;type&quot;: &quot;wokwi-pushbutton&quot;, &quot;id&quot;: &quot;btnEstop&quot;, &quot;top&quot;: 250, &quot;left&quot;: 200,
+      &quot;attrs&quot;: { &quot;color&quot;: &quot;red&quot;, &quot;label&quot;: &quot;E-STOP&quot; } },
+    { &quot;type&quot;: &quot;wokwi-resistor&quot;, &quot;id&quot;: &quot;rEstop&quot;, &quot;top&quot;: 258, &quot;left&quot;: 300,
+      &quot;attrs&quot;: { &quot;value&quot;: &quot;10000&quot; } },
+    { &quot;type&quot;: &quot;wokwi-potentiometer&quot;, &quot;id&quot;: &quot;pot&quot;, &quot;top&quot;: 120, &quot;left&quot;: 400,
+      &quot;attrs&quot;: { &quot;label&quot;: &quot;GROUP SIZE&quot; } }
+  ],
+  &quot;connections&quot;: [
+    [&quot;esp:3V3&quot;, &quot;sr04:VCC&quot;, &quot;red&quot;, [&quot;v-20&quot;]],
+    [&quot;esp:GND.1&quot;, &quot;sr04:GND&quot;, &quot;black&quot;, [&quot;v-30&quot;]],
+    [&quot;esp:13&quot;, &quot;sr04:TRIG&quot;, &quot;green&quot;, [&quot;v-40&quot;]],
+    [&quot;sr04:ECHO&quot;, &quot;esp:VN&quot;, &quot;blue&quot;, [&quot;v20&quot;]],
+
+    [&quot;esp:26&quot;, &quot;ledGreen:A&quot;, &quot;green&quot;, [&quot;v10&quot;]],
+    [&quot;ledGreen:C&quot;, &quot;esp:GND.2&quot;, &quot;black&quot;, [&quot;v-20&quot;]],
+    [&quot;esp:27&quot;, &quot;ledRed:A&quot;, &quot;red&quot;, [&quot;v15&quot;]],
+    [&quot;ledRed:C&quot;, &quot;esp:GND.2&quot;, &quot;black&quot;, [&quot;v-25&quot;]],
+    [&quot;esp:14&quot;, &quot;ledAmber:A&quot;, &quot;orange&quot;, [&quot;v20&quot;]],
+    [&quot;ledAmber:C&quot;, &quot;esp:GND.2&quot;, &quot;black&quot;, [&quot;v-30&quot;]],
+
+    [&quot;esp:25&quot;, &quot;bz:1&quot;, &quot;violet&quot;, [&quot;v25&quot;]],
+    [&quot;bz:2&quot;, &quot;esp:GND.2&quot;, &quot;black&quot;, [&quot;v-35&quot;]],
+
+    [&quot;esp:32&quot;, &quot;btnPerson:1.l&quot;, &quot;blue&quot;, [&quot;v10&quot;]],
+    [&quot;btnPerson:2.l&quot;, &quot;esp:GND.3&quot;, &quot;black&quot;, [&quot;v20&quot;]],
+    [&quot;esp:33&quot;, &quot;btnNonTarget:1.l&quot;, &quot;gold&quot;, [&quot;v20&quot;]],
+    [&quot;btnNonTarget:2.l&quot;, &quot;esp:GND.3&quot;, &quot;black&quot;, [&quot;v30&quot;]],
+    [&quot;esp:35&quot;, &quot;btnEstop:1.l&quot;, &quot;red&quot;, [&quot;v30&quot;]],
+    [&quot;btnEstop:2.l&quot;, &quot;esp:GND.3&quot;, &quot;black&quot;, [&quot;v40&quot;]],
+    [&quot;btnEstop:1.l&quot;, &quot;rEstop:1&quot;, &quot;gray&quot;, [&quot;v-10&quot;]],
+    [&quot;rEstop:2&quot;, &quot;esp:3V3&quot;, &quot;red&quot;, [&quot;v-40&quot;]],
+
+    [&quot;pot:VCC&quot;, &quot;esp:3V3&quot;, &quot;red&quot;, [&quot;v50&quot;]],
+    [&quot;pot:GND&quot;, &quot;esp:GND.3&quot;, &quot;black&quot;, [&quot;v50&quot;]],
+    [&quot;pot:SIG&quot;, &quot;esp:34&quot;, &quot;purple&quot;, [&quot;v40&quot;]]
+  ],
+  &quot;dependencies&quot;: {}
+}
+</pre></div>
+<p style="max-width:74ch;margin-top:16px"><b>Then:</b> click the HC-SR04 in the
+canvas while it is running &mdash; a distance slider appears. Set it to about
+<b>80&nbsp;cm</b> for a permit, and read the reasons in the serial pane. Step 9
+has the full demo script.</p>
+<p class="note" style="border-left-color:var(--accent);background:var(--surface-2)">
+Everything below this box is the same circuit built by hand, one part at a time.
+It is there if you want to know what you pasted &mdash; you do not need it to
+run the simulation.</p>
+</div>
+
+<h2 style="margin-top:30px">The whole circuit</h2>
+<p style="color:var(--muted);max-width:74ch">Ten parts around the ESP32. Read a
+row left to right: ESP32 pin, part terminal, and where the other terminal goes.
+The two bars on the right are the <b>GND</b> and <b>3V3</b> nodes &mdash; every
+wire drawn to a bar is just a wire back to that pin on the ESP32.</p>
+<div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 952 1936" width="100%" role="img" aria-label="Wokwi connection map"><rect width="952" height="1936" fill="#FFFFFF"/><text x="30.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Every wire is a straight line. Both ends are named.</text><text x="30.0" y="56.0" font-size="11" fill="#8695A3" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Pin stubs are stacked in the order the parts need them, not in the board&#x27;s physical order - find each one by its label.</text><rect x="787.0" y="78.0" width="10.0" height="1818.0" rx="5" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="792.0" y="66.0" font-size="12" fill="#2C3238" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="792.0" y="1916.0" font-size="12" fill="#2C3238" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><rect x="867.0" y="78.0" width="10.0" height="1818.0" rx="5" fill="#C0392B" stroke="none" stroke-width="1.2"/><text x="872.0" y="66.0" font-size="12" fill="#C0392B" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">3V3</text><text x="872.0" y="1916.0" font-size="12" fill="#C0392B" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">3V3</text><text x="792.0" y="1934.0" font-size="9.5" fill="#8695A3" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">any GND pin</text><text x="872.0" y="1934.0" font-size="9.5" fill="#8695A3" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">the 3V3 pin</text><rect x="30.0" y="78.0" width="172.0" height="1808.0" rx="10" fill="#1B3A42" stroke="none" stroke-width="1.2"/><rect x="44.0" y="90.0" width="96.0" height="26.0" rx="4" fill="#122A30" stroke="none" stroke-width="1.2"/><text x="92.0" y="108.0" font-size="13" fill="#9FD3D9" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">ESP32</text><rect x="52.0" y="1846.0" width="54.0" height="26.0" rx="4" fill="#3A4149" stroke="none" stroke-width="1.2"/><text x="79.0" y="1864.0" font-size="9.5" fill="#9AA6AE" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">USB</text><rect x="190.0" y="113.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="128.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO26</text><rect x="190.0" y="269.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="284.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO27</text><rect x="190.0" y="425.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="440.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO14</text><rect x="190.0" y="581.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="596.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO25</text><rect x="190.0" y="737.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="752.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO32</text><rect x="190.0" y="893.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="908.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO33</text><rect x="190.0" y="1049.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="1064.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO35</text><rect x="190.0" y="1361.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="1376.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO34</text><rect x="190.0" y="1595.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="1610.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO13</text><rect x="190.0" y="1673.0" width="12.0" height="22.0" rx="2" fill="#D9B44A" stroke="none" stroke-width="1.2"/><text x="182.0" y="1688.0" font-size="11.5" fill="#E7F3F5" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO39 (VN)</text><path d="M453.0,172.6 a24,24 0 0 1 48,0 l0,13.200000000000001 l-48,0 z" fill="#2ECC71" stroke="#00000035" stroke-width="1.3"/><path d="M398.0,124.0 L466.0,184.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,202.0 L488.0,184.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="127.0" font-size="12" fill="#1C7A4B" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">PERMIT</text><text x="477.0" y="213.0" font-size="10" fill="#8695A3" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">LED</text><path d="M453.0,328.6 a24,24 0 0 1 48,0 l0,13.200000000000001 l-48,0 z" fill="#E74C3C" stroke="#00000035" stroke-width="1.3"/><path d="M398.0,280.0 L466.0,340.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,358.0 L488.0,340.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="283.0" font-size="12" fill="#A9291F" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">REFUSE</text><text x="477.0" y="369.0" font-size="10" fill="#8695A3" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">LED</text><path d="M453.0,484.6 a24,24 0 0 1 48,0 l0,13.200000000000001 l-48,0 z" fill="#F1C40F" stroke="#00000035" stroke-width="1.3"/><path d="M398.0,436.0 L466.0,496.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,514.0 L488.0,496.6" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="439.0" font-size="12" fill="#B0850F" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">ESCALATE</text><text x="477.0" y="525.0" font-size="10" fill="#8695A3" text-anchor="middle" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">LED</text><circle cx="477.0" cy="631.0" r="34" fill="#25292D" stroke="#111417" stroke-width="1.6"/><circle cx="477.0" cy="631.0" r="8" fill="#0C0E10" stroke="none" stroke-width="1.0"/><path d="M398.0,592.0 L453.0,631.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,670.0 L501.0,631.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="585.0" font-size="12" fill="#0E7C86" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">BUZZER</text><rect x="437.0" y="753.0" width="80.0" height="68.0" rx="8" fill="#3A4149" stroke="#252A30" stroke-width="1.4"/><circle cx="477.0" cy="787.0" r="23" fill="#2E86C1" stroke="#00000040" stroke-width="1.6"/><path d="M398.0,748.0 L437.0,748.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,826.0 L517.0,826.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="743.0" font-size="12" fill="#0E7C86" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">PERSON</text><rect x="437.0" y="909.0" width="80.0" height="68.0" rx="8" fill="#3A4149" stroke="#252A30" stroke-width="1.4"/><circle cx="477.0" cy="943.0" r="23" fill="#F1C40F" stroke="#00000040" stroke-width="1.6"/><path d="M398.0,904.0 L437.0,904.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,982.0 L517.0,982.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="899.0" font-size="12" fill="#0E7C86" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">DOG / GOAT</text><rect x="437.0" y="1065.0" width="80.0" height="68.0" rx="8" fill="#3A4149" stroke="#252A30" stroke-width="1.4"/><circle cx="477.0" cy="1099.0" r="23" fill="#E74C3C" stroke="#00000040" stroke-width="1.6"/><path d="M398.0,1060.0 L437.0,1060.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,1138.0 L517.0,1138.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><text x="477.0" y="1055.0" font-size="12" fill="#A9291F" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">E-STOP</text><path d="M398.0,1216.0 L556.0,1294.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><rect x="440.0" y="1240.0" width="74.0" height="30.0" rx="5" fill="#E4D5B0" stroke="#B9A67E" stroke-width="1.2"/><rect x="454.0" y="1240.0" width="6.0" height="30.0" rx="1" fill="#8B4513" stroke="none" stroke-width="1.2"/><rect x="467.0" y="1240.0" width="6.0" height="30.0" rx="1" fill="#1A1A1A" stroke="none" stroke-width="1.2"/><rect x="480.0" y="1240.0" width="6.0" height="30.0" rx="1" fill="#E07000" stroke="none" stroke-width="1.2"/><text x="477.0" y="1229.0" font-size="12" fill="#A9291F" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">10k &#937;</text><rect x="431.0" y="1352.0" width="92.0" height="196.0" rx="8" fill="#2E5FA3" stroke="#1F4478" stroke-width="1.4"/><circle cx="477.0" cy="1450.0" r="27" fill="#DEE2E6" stroke="none" stroke-width="1.0"/><path d="M477.0,1450.0 L492.0,1428.0" stroke="#4A5058" stroke-width="3.4" fill="none" stroke-linecap="round"/><text x="477.0" y="1342.0" font-size="12" fill="#B0850F" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GROUP SIZE</text><path d="M398.0,1372.0 L431.0,1372.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,1450.0 L523.0,1450.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,1528.0 L523.0,1528.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><rect x="417.0" y="1584.0" width="120.0" height="278.0" rx="8" fill="#1E4C7A" stroke="#143557" stroke-width="1.4"/><circle cx="477.0" cy="1689.0" r="27" fill="#5A6672" stroke="#39424C" stroke-width="1.8"/><circle cx="477.0" cy="1689.0" r="15" fill="#333B44" stroke="none" stroke-width="1.0"/><circle cx="477.0" cy="1757.0" r="27" fill="#5A6672" stroke="#39424C" stroke-width="1.8"/><circle cx="477.0" cy="1757.0" r="15" fill="#333B44" stroke="none" stroke-width="1.0"/><text x="477.0" y="1574.0" font-size="12" fill="#0E7C86" text-anchor="middle" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">HC-SR04</text><path d="M398.0,1606.0 L417.0,1606.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M398.0,1684.0 L417.0,1684.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,1762.0 L537.0,1762.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M556.0,1840.0 L537.0,1840.0" stroke="#9AA0A6" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M202.0,124.0 L398.0,124.0" stroke="#1C7A4B" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="124.0" r="4.5" fill="#1C7A4B" stroke="none" stroke-width="1.0"/><text x="390.0" y="112.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">A</text><circle cx="556.0" cy="202.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="190.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">C</text><path d="M556.0,202.0 L792.0,202.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="202.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,280.0 L398.0,280.0" stroke="#A9291F" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="280.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><text x="390.0" y="268.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">A</text><circle cx="556.0" cy="358.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="346.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">C</text><path d="M556.0,358.0 L792.0,358.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="358.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,436.0 L398.0,436.0" stroke="#B0850F" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="436.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><text x="390.0" y="424.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">A</text><circle cx="556.0" cy="514.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="502.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">C</text><path d="M556.0,514.0 L792.0,514.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="514.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,592.0 L398.0,592.0" stroke="#0E7C86" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="592.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><text x="390.0" y="580.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">1</text><circle cx="556.0" cy="670.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="658.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">2</text><path d="M556.0,670.0 L792.0,670.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="670.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,748.0 L398.0,748.0" stroke="#0E7C86" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="748.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><text x="390.0" y="736.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">1.l</text><circle cx="556.0" cy="826.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="814.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">2.l</text><path d="M556.0,826.0 L792.0,826.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="826.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,904.0 L398.0,904.0" stroke="#0E7C86" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="904.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><text x="390.0" y="892.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">1.l</text><circle cx="556.0" cy="982.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="970.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">2.l</text><path d="M556.0,982.0 L792.0,982.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="982.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,1060.0 L398.0,1060.0" stroke="#A9291F" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="1060.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><text x="390.0" y="1048.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">1.l</text><circle cx="556.0" cy="1138.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="1126.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">2.l</text><path d="M556.0,1138.0 L792.0,1138.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="1138.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M322.0,1060.0 L322.0,1216.0" stroke="#A9291F" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M322.0,1216.0 L398.0,1216.0" stroke="#A9291F" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="322.0" cy="1060.0" r="6" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="398.0" cy="1216.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><text x="334.0" y="1236.0" font-size="9.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">same node as GPIO35</text><text x="390.0" y="1204.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">1</text><circle cx="556.0" cy="1294.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><text x="564.0" y="1282.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">2</text><path d="M556.0,1294.0 L783.0,1294.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M783,1294 a9,9 0 0 1 18,0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M801.0,1294.0 L872.0,1294.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="872.0" cy="1294.0" r="6" fill="#C0392B" stroke="none" stroke-width="1.0"/><path d="M202.0,1372.0 L398.0,1372.0" stroke="#B0850F" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="1372.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><text x="390.0" y="1360.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">SIG</text><circle cx="556.0" cy="1450.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><text x="564.0" y="1438.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">VCC</text><path d="M556.0,1450.0 L783.0,1450.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M783,1450 a9,9 0 0 1 18,0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M801.0,1450.0 L872.0,1450.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="872.0" cy="1450.0" r="6" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="556.0" cy="1528.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="1516.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><path d="M556.0,1528.0 L792.0,1528.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="1528.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/><path d="M202.0,1606.0 L398.0,1606.0" stroke="#0E7C86" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="1606.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><text x="390.0" y="1594.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">TRIG</text><path d="M202.0,1684.0 L398.0,1684.0" stroke="#0E7C86" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="398.0" cy="1684.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><text x="390.0" y="1672.0" font-size="10" fill="#5D6B79" text-anchor="end" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">ECHO</text><circle cx="556.0" cy="1762.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><text x="564.0" y="1750.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">VCC</text><path d="M556.0,1762.0 L783.0,1762.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M783,1762 a9,9 0 0 1 18,0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M801.0,1762.0 L872.0,1762.0" stroke="#C0392B" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="872.0" cy="1762.0" r="6" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="556.0" cy="1840.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><text x="564.0" y="1828.0" font-size="10" fill="#5D6B79" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><path d="M556.0,1840.0 L792.0,1840.0" stroke="#2C3238" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="792.0" cy="1840.0" r="6" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div>
+
+<div class="callout">
+<div class="lbl">This is the stripped version</div>
+<p>Eleven parts and 23 wires, against seventeen parts and thirty in the
+hardware build. Everything that exists only to protect real silicon is gone: the
+three LED series resistors, the buzzer's resistor, and the 1k/2k divider on ECHO.
+A simulated pin has no current to exceed and no voltage to survive.</p>
+<p><b>One passive stays.</b> The 10&nbsp;k pull-up on GPIO35 is not protection,
+it is function &mdash; GPIO34&ndash;39 have no internal pull-up in the silicon and
+Wokwi models that. Without it the E-stop floats and latches on its own.</p>
+<p><b>Do not build hardware from this page.</b> Use the breadboard guide for that.
+The behaviour is identical; the electrics are not.</p>
+</div>
+
+<div class="step" id="w1"><div class="shead"><span class="num">1</span><h2>Open a new ESP32 project</h2></div><div class="body"><ol><li>Go to <b>wokwi.com</b> and pick <b>ESP32</b> &rarr; <b>Blank Project</b>. You do not need an account to run it; you need one to save it.</li><li>You get two panes: <code>sketch.ino</code> on the left, an empty canvas with one ESP32 on the right.</li></ol><div class="note">There is no breadboard anywhere in this build. In Wokwi you wire parts directly to the board, which is why this version is quicker to assemble than the physical one - and why it cannot teach you breadboard rows.</div></div></div><div class="step" id="w2"><div class="shead"><span class="num">2</span><h2>Paste the firmware</h2></div><div class="body"><ol><li>Select everything in <code>sketch.ino</code> and replace it with the code below. It is the same firmware as the hardware build, unchanged.</li><li>Nothing to install: no libraries, no board manager.</li></ol><div class="cp"><button data-copy="sk2">Copy</button><pre id="sk2">/*
+ * GauKavach - bench governor, ESP32
+ * ---------------------------------
+ * Same rule set as the Uno sketch, plus the one thing an Uno physically
+ * cannot do: a RAMPED burst envelope.
+ *
+ * Arduino tone() emits a hard-gated square wave. Our own spectrum analysis
+ * (gaukavach spectrum) says that is the wrong waveform: the rectangular gate
+ * splatters broadband switching energy into the audible band, so the device
+ * clicks at every activation even though the carrier is ultrasonic. OSHA
+ * documents exactly this failure mode.
+ *
+ * The ESP32&#x27;s LEDC peripheral gives independent control of frequency and duty,
+ * so the duty cycle can be ramped up and down with a raised-cosine profile.
+ * That is the hardware expression of emitter.py&#x27;s _raised_cosine_envelope().
+ *
+ * Honest scope, unchanged from the Uno sketch:
+ *   - no calibrated microphone is attached, so this rig makes NO dB claim
+ *   - duty ramping shapes the drive envelope; it is not a substitute for
+ *     measuring the acoustic output of a real transducer
+ *   - a 40 kHz ranging element is the wrong part (above the 35 kHz cattle
+ *     audiogram endpoint) and stands in for the signal chain only
+ *
+ * ARDUINO IDE SETTINGS
+ *   Tools &gt; Board            ESP32 Arduino &gt; ESP32 Dev Module
+ *   Tools &gt; Upload Speed     921600  (drop to 115200 if uploads fail)
+ *   Tools &gt; Port             whatever COM port appears when the board is plugged in
+ *   No libraries to install: everything used here ships with the ESP32 core.
+ * If the port never appears, it is the CP2102 / CH340 USB-serial driver, not
+ * the sketch. If upload stalls at &quot;Connecting...&quot;, hold BOOT while it starts.
+ *
+ * The LEDC API changed between Arduino-ESP32 core 2.x and 3.x: ledcSetup() and
+ * ledcAttachPin() were removed, and ledcWrite() now takes a PIN rather than a
+ * channel. Both Wokwi and this machine&#x27;s IDE are on core 3.x; the wrappers
+ * below still cover 2.x so the sketch survives an older install elsewhere.
+ *
+ * REAL HARDWARE vs THE SIMULATOR
+ * A simulator hands you a clean sensor reading, a clean ADC and a bounce-free
+ * button. A breadboard hands you none of those, and each one has a specific
+ * way of ruining a live demo, so each is conditioned below: see &#x27;input
+ * conditioning&#x27;. The governor logic itself is untouched - the whole point is
+ * that the rules are the same everywhere they are stated.
+ */
+
+/* ---------------- pins ---------------- */
+const int PIN_TRIG      = 13;
+const int PIN_ECHO      = 39;   // VN. NOT 12: GPIO12 is a strapping pin (MTDI)
+const int PIN_EMIT      = 25;   // LEDC output -&gt; 220R -&gt; transistor -&gt; transducer
+
+const int LED_PERMIT    = 26;   // green
+const int LED_REFUSE    = 27;   // red
+const int LED_ESCALATE  = 14;   // amber
+const int LED_ARMED     = 2;    // on-board blue
+
+const int BTN_PERSON    = 32;
+const int BTN_NONTARGET = 33;
+const int BTN_ESTOP     = 35;   // input-only pin, needs an external pull-up
+
+/* Pin choices avoid the ESP32 strapping pins 0, 2, 5, 12 and 15, which are
+ * sampled at reset. GPIO2 is the exception: it is the on-board LED, driven as
+ * an output only, which is the standard and safe use of it. */
+const int POT_GROUP     = 34;   // ADC1, input-only
+
+/* ---------------- LEDC ---------------- */
+const int      LEDC_CH   = 0;
+const int      LEDC_RES  = 8;          // 8-bit duty, 0..255
+const uint32_t CARRIER_HZ = 25000;     // inside the documented 22-30 kHz band
+const uint8_t  DUTY_PEAK = 128;        // 50% = maximum drive for a square carrier
+const uint16_t RAMP_MS   = 25;         // raised-cosine rise and fall
+
+/* ------------- governor limits, mirroring evidence.py ------------- */
+const uint8_t  MAX_GROUP         = 3;
+const uint32_t MAX_ACTIVATION_MS = 6000;
+const uint32_t MIN_SILENCE_MS    = 20000;
+const uint32_t DAILY_BUDGET_MS   = 120000;
+const uint32_t ESCALATE_AFTER_MS = 25000;
+const uint8_t  MAX_ATTEMPTS      = 3;
+/* Live demos cannot wait 20 s between bursts, so the long timers are divided
+ * by this and the true values are printed at boot - the compression is stated,
+ * not hidden. Set to 4, not 10: at 10x, escalation fires 2.5 s after detection,
+ * which is quicker than you can reach for a button, so every veto you try to
+ * demonstrate has already gone to amber. Verified in the simulator. */
+const uint16_t DEMO_SPEED        = 4;
+
+const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
+const float RANGE_MAX_M = 42.8;
+const float LINE_M      = 12.0;
+
+enum State { IDLE, TRACKING, EMITTING, COOLDOWN, ESCALATED, INHIBITED };
+State state = IDLE;
+
+uint32_t emitStartedAt = 0, lastEmissionEnd = 0, exposureUsedMs = 0;
+uint32_t incidentStart = 0, lastBeat = 0, lastPrint = 0;
+uint8_t  attempts = 0;
+bool     doNotEmit = false, estopLatched = false, armedLed = false;
+
+uint32_t scaled(uint32_t ms) { return ms / DEMO_SPEED; }
+
+/* ---- LEDC portability shim: core 2.x and 3.x ----
+ * ESP_ARDUINO_VERSION_MAJOR is undefined on very old cores, which the
+ * preprocessor treats as 0, so the 2.x branch is the safe default. */
+#if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
+static inline void emitAttach()            { ledcAttach(PIN_EMIT, CARRIER_HZ, LEDC_RES); }
+static inline void emitDuty(uint32_t duty) { ledcWrite(PIN_EMIT, duty); }
+#else
+static inline void emitAttach() {
+  ledcSetup(LEDC_CH, CARRIER_HZ, LEDC_RES);
+  ledcAttachPin(PIN_EMIT, LEDC_CH);
+}
+static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
+#endif
+
+void emitStop();
+
+/* ---------------- input conditioning ----------------
+ *
+ * Three noise sources, three specific demo failures:
+ *
+ *   button bounce   -&gt; one glitch on a jumper latches the E-stop and the
+ *                      emitter is dead for the rest of the presentation
+ *   ADC noise       -&gt; ESP32 ADC1 wanders by tens of counts while nothing
+ *                      moves; the group-size threshold is an integer boundary,
+ *                      so a still potentiometer flips PERMITTED / REFUSED
+ *   sonar outliers  -&gt; a real HC-SR04 throws a bad ping regularly, off soft
+ *                      surfaces or while the previous burst is still ringing;
+ *                      one of those reads as &#x27;target lost&#x27; and resets the run
+ *
+ * None of this changes a single governor rule. It only stops the inputs from
+ * lying to the rules.
+ */
+
+// A pin must agree with itself on this many consecutive passes to be believed.
+const uint8_t DEBOUNCE_PASSES = 4;
+const uint8_t GROUP_PASSES    = 3;
+const uint8_t ADC_SAMPLES     = 16;
+const uint8_t PING_GAP_MS     = 10;   // let the previous burst die down
+
+const uint8_t B_PERSON = 0, B_NONTARGET = 1, B_ESTOP = 2, B_COUNT = 3;
+int     btnPin[B_COUNT];
+bool    btnStable[B_COUNT]    = {false, false, false};
+bool    btnCandidate[B_COUNT] = {false, false, false};
+uint8_t btnAgree[B_COUNT]     = {0, 0, 0};
+
+bool pressed(uint8_t i) {
+  bool raw = (digitalRead(btnPin[i]) == LOW);      // press-to-ground
+  if (raw != btnCandidate[i]) { btnCandidate[i] = raw; btnAgree[i] = 0; }
+  else if (btnAgree[i] &lt; DEBOUNCE_PASSES) { btnAgree[i]++; }
+  if (btnAgree[i] &gt;= DEBOUNCE_PASSES) btnStable[i] = btnCandidate[i];
+  return btnStable[i];
+}
+
+uint8_t groupStable = 1;
+
+uint8_t readGroup() {
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i &lt; ADC_SAMPLES; i++) acc += analogRead(POT_GROUP);
+  long    span = map((long)(acc / ADC_SAMPLES), 0L, 4095L, 1L, 8L);
+  uint8_t want = (uint8_t)constrain(span, 1L, 8L);
+
+  static uint8_t candidate = 1, agree = 0;
+  if (want != candidate) { candidate = want; agree = 0; }
+  else if (agree &lt; GROUP_PASSES) { agree++; }
+  if (agree &gt;= GROUP_PASSES) groupStable = candidate;
+  return groupStable;
+}
+
+void setup() {
+  pinMode(PIN_TRIG, OUTPUT);
+  pinMode(PIN_ECHO, INPUT);
+  pinMode(LED_PERMIT, OUTPUT);
+  pinMode(LED_REFUSE, OUTPUT);
+  pinMode(LED_ESCALATE, OUTPUT);
+  pinMode(LED_ARMED, OUTPUT);
+  pinMode(BTN_PERSON, INPUT_PULLUP);
+  pinMode(BTN_NONTARGET, INPUT_PULLUP);
+  pinMode(BTN_ESTOP, INPUT);        // GPIO35 has no internal pull-up: add 10k to 3V3
+  btnPin[B_PERSON]    = BTN_PERSON;
+  btnPin[B_NONTARGET] = BTN_NONTARGET;
+  btnPin[B_ESTOP]     = BTN_ESTOP;
+
+  emitAttach();
+  emitDuty(0);
+
+  Serial.begin(115200);
+  delay(200);
+  Serial.println();
+  Serial.println(&quot;GauKavach bench governor - ESP32&quot;);
+  Serial.println(&quot;========================================&quot;);
+  Serial.printf(&quot;carrier          %lu Hz, %d-bit duty, raised-cosine %d ms ramp\n&quot;,
+                (unsigned long)CARRIER_HZ, LEDC_RES, RAMP_MS);
+  Serial.printf(&quot;max activation   %.1f s   (demo %.1f s)\n&quot;,
+                MAX_ACTIVATION_MS / 1000.0, scaled(MAX_ACTIVATION_MS) / 1000.0);
+  Serial.printf(&quot;quiet period     %.1f s   (demo %.1f s)\n&quot;,
+                MIN_SILENCE_MS / 1000.0, scaled(MIN_SILENCE_MS) / 1000.0);
+  Serial.printf(&quot;daily budget     %.1f s   (demo %.1f s)\n&quot;,
+                DAILY_BUDGET_MS / 1000.0, scaled(DAILY_BUDGET_MS) / 1000.0);
+  Serial.printf(&quot;max group        %d\n&quot;, MAX_GROUP);
+  Serial.println(&quot;timers compressed for the demo; shipped values shown first&quot;);
+  Serial.println(&quot;NO calibrated mic attached: this rig makes no dB claim&quot;);
+  Serial.println();
+}
+
+/* Raised-cosine rise. Blocking for RAMP_MS, which is acceptable here because
+ * nothing else needs servicing during a 25 ms envelope, and it keeps the shape
+ * identical to emitter.py rather than approximated by a scheduler. */
+void emitStart() {
+  for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
+    float x = (float)t / RAMP_MS;                 // 0..1
+    float e = 0.5f * (1.0f - cosf(PI * x));       // raised cosine
+    emitDuty((uint32_t)(DUTY_PEAK * e));
+    delay(1);
+  }
+  emitDuty(DUTY_PEAK);
+}
+
+void emitFade() {
+  for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
+    float x = (float)t / RAMP_MS;
+    float e = 0.5f * (1.0f + cosf(PI * x));       // mirror of the rise
+    emitDuty((uint32_t)(DUTY_PEAK * e));
+    delay(1);
+  }
+  emitDuty(0);
+}
+
+void emitStop(const char *why) {
+  if (state == EMITTING) {
+    emitFade();
+    uint32_t dur = millis() - emitStartedAt;
+    exposureUsedMs += dur;
+    lastEmissionEnd = millis();
+    Serial.printf(&quot;  emission ended after %lu ms - %s\n&quot;, (unsigned long)dur, why);
+    if (exposureUsedMs &gt;= scaled(DAILY_BUDGET_MS)) {
+      doNotEmit = true;
+      Serial.println(&quot;  DAILY EXPOSURE BUDGET EXHAUSTED -&gt; do-not-emit latched&quot;);
+    }
+  }
+  emitDuty(0);
+}
+
+float pingOnceCm() {
+  digitalWrite(PIN_TRIG, LOW);  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  unsigned long us = pulseIn(PIN_ECHO, HIGH, 25000UL);
+  if (us == 0) return -1.0f;            // no echo != &quot;animal is adjacent&quot;
+  return us / 58.0f;
+}
+
+/* Median of three. One bad ping cannot move the answer, and the no-echo case
+ * still wins when two of three agree on it - which is the behaviour we want,
+ * because &#x27;nothing there&#x27; has to stay easy to conclude. */
+float readRangeCm() {
+  float a = pingOnceCm(); delay(PING_GAP_MS);
+  float b = pingOnceCm(); delay(PING_GAP_MS);
+  float c = pingOnceCm();
+  float hi = max(a, max(b, c));
+  float lo = min(a, min(b, c));
+  return a + b + c - hi - lo;
+}
+
+void leds(bool p, bool r, bool e) {
+  digitalWrite(LED_PERMIT, p);
+  digitalWrite(LED_REFUSE, r);
+  digitalWrite(LED_ESCALATE, e);
+}
+
+void loop() {
+  uint32_t now = millis();
+
+  /* Sample every input on every pass, before any early return. A debounce
+   * counter that only advances while a target is present is worse than none:
+   * a veto button already held down when the animal walks in would need four
+   * more passes to be believed, and the governor would permit emission in the
+   * gap. Safety inputs must be settled before they are needed, not after. */
+  bool person    = pressed(B_PERSON);
+  bool nonTarget = pressed(B_NONTARGET);
+  uint8_t group  = readGroup();
+
+  if (pressed(B_ESTOP)) estopLatched = true;
+  if (estopLatched) {
+    emitStop(&quot;E-STOP&quot;);
+    state = INHIBITED;
+    leds(false, true, false);
+    digitalWrite(LED_ARMED, LOW);
+    if (now - lastPrint &gt; 1000) {
+      Serial.println(&quot;E-STOP LATCHED - emitter dead until reset&quot;);
+      lastPrint = now;
+    }
+    return;
+  }
+
+  if (now - lastBeat &gt; 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
+
+  float cm = readRangeCm();
+  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; 200);
+  float metres = seen ? (cm / DESK_SCALE) : 999.0f;
+
+  if (state == EMITTING &amp;&amp; (now - emitStartedAt) &gt;= scaled(MAX_ACTIVATION_MS)) {
+    emitStop(&quot;WATCHDOG max activation&quot;);
+    state = COOLDOWN;
+  }
+
+  if (!seen) {
+    if (state == EMITTING) emitStop(&quot;target lost&quot;);
+    if (state != INHIBITED) state = IDLE;
+    attempts = 0; incidentStart = 0;
+    leds(false, false, false);
+    return;
+  }
+
+  if (incidentStart == 0) {
+    incidentStart = now;
+    Serial.printf(&quot;DETECTION at %.1f m (scaled)\n&quot;, metres);
+  }
+
+  const char *deny = nullptr;
+  if (doNotEmit)                     deny = &quot;animal is on the do-not-emit list&quot;;
+  else if (person)                   deny = &quot;a person is inside the exposure cone&quot;;
+  else if (nonTarget)                deny = &quot;a non-target species is inside the cone&quot;;
+  else if (group &gt; MAX_GROUP)        deny = &quot;group large enough that a startle could cascade&quot;;
+  else if (metres &gt; RANGE_MAX_M)     deny = &quot;beyond the acoustic envelope&quot;;
+  else if (metres &lt;= LINE_M)         deny = &quot;already at the carriageway - fleeing would cross it&quot;;
+  else if (state == COOLDOWN &amp;&amp;
+           (now - lastEmissionEnd) &lt; scaled(MIN_SILENCE_MS))
+                                     deny = &quot;enforced quiet period&quot;;
+
+  bool timedOut = (now - incidentStart) &gt; scaled(ESCALATE_AFTER_MS);
+  if (state != EMITTING &amp;&amp; (attempts &gt;= MAX_ATTEMPTS || timedOut)) {
+    if (state != ESCALATED) {
+      emitStop(&quot;escalating&quot;);
+      Serial.println(&quot;  ESCALATED -&gt; traffic warning + human dispatch&quot;);
+      Serial.println(&quot;  (acoustic cues are not stock-proof; the system stops)&quot;);
+      state = ESCALATED;
+    }
+    leds(false, false, true);
+    return;
+  }
+
+  if (deny != nullptr) {
+    if (state == EMITTING) emitStop(deny);
+    state = (state == COOLDOWN) ? COOLDOWN : TRACKING;
+    leds(false, true, false);
+    if (now - lastPrint &gt; 800) {
+      Serial.printf(&quot;REFUSED @ %.1f m  group=%d  -&gt; %s\n&quot;, metres, group, deny);
+      lastPrint = now;
+    }
+    return;
+  }
+
+  if (state != EMITTING) {
+    state = EMITTING;
+    emitStartedAt = millis();
+    attempts++;
+    Serial.printf(&quot;PERMITTED @ %.1f m  attempt %d/%d  carrier %.1f kHz  ramped %d ms\n&quot;,
+                  metres, attempts, MAX_ATTEMPTS, CARRIER_HZ / 1000.0, RAMP_MS);
+    Serial.printf(&quot;  budget used %lu / %lu ms\n&quot;,
+                  (unsigned long)exposureUsedMs, (unsigned long)scaled(DAILY_BUDGET_MS));
+    emitStart();
+  }
+  leds(true, false, false);
+}
+</pre></div><div class="note">The pin map in the code is what the rest of this manual wires to. If you change a pin in one place you have to change it in both, so it is easier not to.</div></div></div><div class="step" id="w3"><div class="shead"><span class="num ok">3</span><h2>Three status LEDs</h2></div><div class="body"><ol><li>Click the blue <b>+</b> on the canvas and add <b>LED</b> three times.</li><li>Set their colours to green, red and yellow in the parts panel.</li><li>Wire each one: GPIO to the <b>anode</b> (the longer pin, marked A), cathode to any ESP32 <b>GND</b>.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 354" width="100%" role="img" aria-label="LEDs"><rect width="940" height="354" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Straight from the pin to the LED. No resistor in the simulator.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#1C7A4B" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO26</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#1C7A4B" stroke="none" stroke-width="1.2"/><path d="M257,83 a11,11 0 0 1 22,0 l0,8 l-22,0 z" fill="#2ECC71" stroke="#00000035" stroke-width="1"/><path d="M262.0,91.0 L262.0,96.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M274.0,91.0 L274.0,96.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GREEN LED</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">anode  -  PERMIT</text><rect x="436.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">cathode</text><path d="M192.0,80.0 L236.0,80.0" stroke="#1C7A4B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#1C7A4B" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#1C7A4B" stroke="none" stroke-width="1.0"/><path d="M392.0,80.0 L436.0,80.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><rect x="36.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><text x="54.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO27</text><text x="54.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><path d="M257,189 a11,11 0 0 1 22,0 l0,8 l-22,0 z" fill="#E74C3C" stroke="#00000035" stroke-width="1"/><path d="M262.0,197.0 L262.0,202.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M274.0,197.0 L274.0,202.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="184.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">RED LED</text><text x="290.0" y="202.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">anode  -  REFUSE</text><rect x="436.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">cathode</text><path d="M192.0,186.0 L236.0,186.0" stroke="#A9291F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="186.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="186.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><path d="M392.0,186.0 L436.0,186.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><rect x="36.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#B0850F" stroke="none" stroke-width="1.2"/><text x="54.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO14</text><text x="54.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#B0850F" stroke="none" stroke-width="1.2"/><path d="M257,295 a11,11 0 0 1 22,0 l0,8 l-22,0 z" fill="#F1C40F" stroke="#00000035" stroke-width="1"/><path d="M262.0,303.0 L262.0,308.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M274.0,303.0 L274.0,308.0" stroke="#8A8F96" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="290.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">AMBER LED</text><text x="290.0" y="308.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">anode  -  ESCALATE</text><rect x="436.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">cathode</text><path d="M192.0,292.0 L236.0,292.0" stroke="#B0850F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="292.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="292.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><path d="M392.0,292.0 L436.0,292.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">ESP32 GPIO26</td><td class="w">PERMIT LED A</td></tr><tr><td class="w">PERMIT LED C</td><td class="w">ESP32 GND</td></tr><tr><td class="w">ESP32 GPIO27</td><td class="w">REFUSE LED A</td></tr><tr><td class="w">REFUSE LED C</td><td class="w">ESP32 GND</td></tr><tr><td class="w">ESP32 GPIO14</td><td class="w">ESCALATE LED A</td></tr><tr><td class="w">ESCALATE LED C</td><td class="w">ESP32 GND</td></tr></tbody></table></div><div class="note">Green means it decided to emit, red means it refused, amber means it gave up and asked for a human. Most of your demo happens on the red one.</div></div></div><div class="step" id="w4"><div class="shead"><span class="num">4</span><h2>The emitter</h2></div><div class="body"><ol><li>Add <b>Buzzer</b>. Wire pin 1 to GPIO25 and pin 2 to GND.</li><li>Turn its volume down in the parts panel before you present.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 142" width="100%" role="img" aria-label="Buzzer"><rect width="940" height="142" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Two wires. The buzzer is the emitter stand-in.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO25</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">LEDC carrier</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><circle cx="268.0" cy="80.0" r="13" fill="#C9A227" stroke="#9A7B15" stroke-width="1.4"/><circle cx="268.0" cy="80.0" r="6" fill="#EEE3AC" stroke="none" stroke-width="1.0"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">BUZZER 1</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">the driven pin</text><rect x="436.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">BUZZER 2</text><path d="M192.0,80.0 L236.0,80.0" stroke="#0E7C86" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><path d="M392.0,80.0 L436.0,80.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">ESP32 GPIO25</td><td class="w">Buzzer 1</td></tr><tr><td class="w">Buzzer 2</td><td class="w">ESP32 GND</td></tr></tbody></table></div><div class="note">The buzzer is a stand-in for the ultrasonic transducer, and audible on purpose - you need to hear the ramped envelope start and stop. Say that out loud when you demo it rather than letting someone catch it.</div></div></div><div class="step" id="w5"><div class="shead"><span class="num crit">5</span><h2>The three veto buttons</h2></div><div class="body"><ol><li>Add <b>Pushbutton</b> three times. Label them PERSON, DOG / GOAT and E-STOP.</li><li>Wire each: GPIO to one left leg, GND to the other left leg.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 354" width="100%" role="img" aria-label="Buttons"><rect width="940" height="354" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Pin to the left leg, ground to the other left leg.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO32</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">input</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><rect x="255.0" y="67.0" width="26.0" height="26.0" rx="4" fill="#3A4149" stroke="#252A30" stroke-width="1.2"/><circle cx="268.0" cy="80.0" r="8" fill="#2E86C1" stroke="#00000040" stroke-width="1.2"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">PERSON</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">human in cone</text><rect x="436.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">opposite leg</text><path d="M192.0,80.0 L236.0,80.0" stroke="#0E7C86" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><path d="M392.0,80.0 L436.0,80.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="80.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><rect x="36.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><text x="54.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO33</text><text x="54.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">input</text><rect x="236.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><rect x="255.0" y="173.0" width="26.0" height="26.0" rx="4" fill="#3A4149" stroke="#252A30" stroke-width="1.2"/><circle cx="268.0" cy="186.0" r="8" fill="#F1C40F" stroke="#00000040" stroke-width="1.2"/><text x="290.0" y="184.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">DOG / GOAT</text><text x="290.0" y="202.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">non-target</text><rect x="436.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">opposite leg</text><path d="M192.0,186.0 L236.0,186.0" stroke="#0E7C86" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="186.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="186.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><path d="M392.0,186.0 L436.0,186.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><rect x="36.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><text x="54.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO35</text><text x="54.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">input</text><rect x="236.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><rect x="255.0" y="279.0" width="26.0" height="26.0" rx="4" fill="#3A4149" stroke="#252A30" stroke-width="1.2"/><circle cx="268.0" cy="292.0" r="8" fill="#E74C3C" stroke="#00000040" stroke-width="1.2"/><text x="290.0" y="290.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">E-STOP</text><text x="290.0" y="308.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">kills emission</text><rect x="436.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">opposite leg</text><path d="M192.0,292.0 L236.0,292.0" stroke="#A9291F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="292.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="292.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><path d="M392.0,292.0 L436.0,292.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">ESP32 GPIO32</td><td class="w">PERSON button 1.l</td></tr><tr><td class="w">PERSON button 2.l</td><td class="w">ESP32 GND</td></tr><tr><td class="w">ESP32 GPIO33</td><td class="w">DOG / GOAT button 1.l</td></tr><tr><td class="w">DOG / GOAT button 2.l</td><td class="w">ESP32 GND</td></tr><tr><td class="w">ESP32 GPIO35</td><td class="w">E-STOP button 1.l</td></tr><tr><td class="w">E-STOP button 2.l</td><td class="w">ESP32 GND</td></tr></tbody></table></div><div class="note crit">Press-to-ground is the right way round for a safety input: a broken wire reads as <i>not pressed</i> rather than as a stuck button.</div></div></div><div class="step" id="w6"><div class="shead"><span class="num crit">6</span><h2>The one resistor</h2></div><div class="body"><ol><li>Add <b>Resistor</b> and set its value to <b>10000</b>.</li><li>Wire it from the E-STOP button's GPIO35 leg to <b>3V3</b>.</li><li>It sits <b>alongside</b> the button on the same node, not in line with it.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 248" width="100%" role="img" aria-label="Pull-up"><rect width="940" height="248" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#A9291F" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">The one resistor in the whole project. It is not optional.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO35</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">input only, no pull-up</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><circle cx="268.0" cy="80.0" r="7" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="268.0" cy="80.0" r="12" fill="none" stroke="#A9291F" stroke-width="1.6"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">JUNCTION</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">the E-STOP pin leg</text><rect x="436.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="436.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><rect x="453.0" y="72.0" width="30.0" height="16.0" rx="3" fill="#E4D5B0" stroke="#B9A67E" stroke-width="1.2"/><rect x="459.0" y="72.0" width="3.0" height="16.0" rx="1" fill="#8B4513" stroke="none" stroke-width="1.2"/><rect x="465.0" y="72.0" width="3.0" height="16.0" rx="1" fill="#1A1A1A" stroke="none" stroke-width="1.2"/><rect x="471.0" y="72.0" width="3.0" height="16.0" rx="1" fill="#E07000" stroke="none" stroke-width="1.2"/><text x="490.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">10k &#937;</text><text x="490.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">pull-up resistor</text><rect x="636.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="636.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><text x="654.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">3V3</text><text x="654.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><path d="M192.0,80.0 L236.0,80.0" stroke="#A9291F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><path d="M392.0,80.0 L436.0,80.0" stroke="#C0392B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><path d="M592.0,80.0 L636.0,80.0" stroke="#C0392B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="592.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="636.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><rect x="236.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#A9291F" stroke="none" stroke-width="1.2"/><rect x="255.0" y="173.0" width="26.0" height="26.0" rx="4" fill="#3A4149" stroke="#252A30" stroke-width="1.2"/><circle cx="268.0" cy="186.0" r="8" fill="#E74C3C" stroke="#00000040" stroke-width="1.2"/><text x="290.0" y="184.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">E-STOP</text><text x="290.0" y="202.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">wired in the last step</text><rect x="436.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="436.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="454.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="454.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">opposite leg</text><path d="M314.0,112.0 L314.0,154.0" stroke="#A9291F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="314.0" cy="112.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><circle cx="314.0" cy="154.0" r="4.5" fill="#A9291F" stroke="none" stroke-width="1.0"/><path d="M392.0,186.0 L436.0,186.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="392.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="436.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">E-STOP button 1.l</td><td class="w">Resistor 10k leg 1</td></tr><tr><td class="w">Resistor 10k leg 2</td><td class="w">ESP32 3V3</td></tr></tbody></table></div><div class="note crit">GPIO34&ndash;39 are input-only and have <b>no internal pull-up in the silicon</b>, and Wokwi models that faithfully. Skip this and the E-stop latches at random, which looks exactly like a software bug.</div></div></div><div class="step" id="w7"><div class="shead"><span class="num warn">7</span><h2>Group-size knob</h2></div><div class="body"><ol><li>Add <b>Potentiometer</b>. Wire VCC to 3V3, GND to GND, SIG to GPIO34.</li><li>Drag it fully anticlockwise before you start.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 354" width="100%" role="img" aria-label="Potentiometer"><rect width="940" height="354" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Three wires. The middle terminal is the wiper.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">3V3</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><rect x="255.0" y="68.0" width="26.0" height="24.0" rx="4" fill="#2E5FA3" stroke="#1F4478" stroke-width="1.2"/><circle cx="268.0" cy="78.0" r="8" fill="#DEE2E6" stroke="none" stroke-width="1.0"/><path d="M268.0,78.0 L273.0,73.0" stroke="#4A5058" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">POT VCC</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">VCC terminal</text><path d="M192.0,80.0 L236.0,80.0" stroke="#C0392B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><rect x="36.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#B0850F" stroke="none" stroke-width="1.2"/><text x="54.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO34</text><text x="54.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#B0850F" stroke="none" stroke-width="1.2"/><rect x="255.0" y="174.0" width="26.0" height="24.0" rx="4" fill="#2E5FA3" stroke="#1F4478" stroke-width="1.2"/><circle cx="268.0" cy="184.0" r="8" fill="#DEE2E6" stroke="none" stroke-width="1.0"/><path d="M268.0,184.0 L273.0,179.0" stroke="#4A5058" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="184.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">POT SIG</text><text x="290.0" y="202.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">SIG - the wiper</text><path d="M192.0,186.0 L236.0,186.0" stroke="#B0850F" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="186.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="186.0" r="4.5" fill="#B0850F" stroke="none" stroke-width="1.0"/><rect x="36.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="54.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="54.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><rect x="255.0" y="280.0" width="26.0" height="24.0" rx="4" fill="#2E5FA3" stroke="#1F4478" stroke-width="1.2"/><circle cx="268.0" cy="290.0" r="8" fill="#DEE2E6" stroke="none" stroke-width="1.0"/><path d="M268.0,290.0 L273.0,285.0" stroke="#4A5058" stroke-width="2" fill="none" stroke-linecap="round"/><text x="290.0" y="290.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">POT GND</text><text x="290.0" y="308.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">GND terminal</text><path d="M192.0,292.0 L236.0,292.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="292.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">GROUP SIZE VCC</td><td class="w">ESP32 3V3</td></tr><tr><td class="w">GROUP SIZE GND</td><td class="w">ESP32 GND</td></tr><tr><td class="w">GROUP SIZE SIG</td><td class="w">ESP32 GPIO34</td></tr></tbody></table></div><div class="note">This is how you show the herd rule live: turn it past 3 and the governor refuses, because a startle in a group can cascade into the road.</div></div></div><div class="step" id="w8"><div class="shead"><span class="num ok">8</span><h2>The distance sensor</h2></div><div class="body"><ol><li>Add <b>HC-SR04 Ultrasonic Distance Sensor</b>.</li><li>Wire VCC to <b>3V3</b>, GND to GND, TRIG to GPIO13, ECHO to <b>GPIO39</b> &mdash; which Wokwi labels <b>VN</b>.</li><li>Click the sensor while the simulation runs to get its distance slider.</li></ol><div class="pic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 460" width="100%" role="img" aria-label="Sensor"><rect width="940" height="460" fill="#FFFFFF"/><text x="36.0" y="34.0" font-size="13" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">Four wires. In the simulator the sensor runs on 3V3, so ECHO needs no divider.</text><rect x="36.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><text x="54.0" y="78.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">3V3</text><text x="54.0" y="96.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="48.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="48.0" width="4.5" height="64.0" rx="2" fill="#C0392B" stroke="none" stroke-width="1.2"/><rect x="253.0" y="70.0" width="30.0" height="20.0" rx="3" fill="#1E4C7A" stroke="#143557" stroke-width="1.2"/><circle cx="261.0" cy="79.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><circle cx="275.0" cy="79.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><text x="290.0" y="78.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">SR04 VCC</text><text x="290.0" y="96.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">sensor supply</text><path d="M192.0,80.0 L236.0,80.0" stroke="#C0392B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="80.0" r="4.5" fill="#C0392B" stroke="none" stroke-width="1.0"/><rect x="36.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><text x="54.0" y="184.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GND</text><text x="54.0" y="202.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="154.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="154.0" width="4.5" height="64.0" rx="2" fill="#2C3238" stroke="none" stroke-width="1.2"/><rect x="253.0" y="176.0" width="30.0" height="20.0" rx="3" fill="#1E4C7A" stroke="#143557" stroke-width="1.2"/><circle cx="261.0" cy="185.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><circle cx="275.0" cy="185.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><text x="290.0" y="184.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">SR04 GND</text><text x="290.0" y="202.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">sensor ground</text><path d="M192.0,186.0 L236.0,186.0" stroke="#2C3238" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="186.0" r="4.5" fill="#2C3238" stroke="none" stroke-width="1.0"/><rect x="36.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#1C7A4B" stroke="none" stroke-width="1.2"/><text x="54.0" y="290.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO13</text><text x="54.0" y="308.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="260.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="260.0" width="4.5" height="64.0" rx="2" fill="#1C7A4B" stroke="none" stroke-width="1.2"/><rect x="253.0" y="282.0" width="30.0" height="20.0" rx="3" fill="#1E4C7A" stroke="#143557" stroke-width="1.2"/><circle cx="261.0" cy="291.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><circle cx="275.0" cy="291.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><text x="290.0" y="290.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">SR04 TRIG</text><text x="290.0" y="308.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">trigger out</text><path d="M192.0,292.0 L236.0,292.0" stroke="#1C7A4B" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="292.0" r="4.5" fill="#1C7A4B" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="292.0" r="4.5" fill="#1C7A4B" stroke="none" stroke-width="1.0"/><rect x="36.0" y="366.0" width="156.0" height="64.0" rx="8" fill="#1B3A42" stroke="none" stroke-width="1.3"/><rect x="36.0" y="366.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><text x="54.0" y="396.0" font-size="12.5" fill="#E4F2F4" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">GPIO39 (VN)</text><text x="54.0" y="414.0" font-size="10.5" fill="#8FB4BA" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">ESP32</text><rect x="236.0" y="366.0" width="156.0" height="64.0" rx="8" fill="#F5F8FA" stroke="#D2DAE1" stroke-width="1.3"/><rect x="236.0" y="366.0" width="4.5" height="64.0" rx="2" fill="#0E7C86" stroke="none" stroke-width="1.2"/><rect x="253.0" y="388.0" width="30.0" height="20.0" rx="3" fill="#1E4C7A" stroke="#143557" stroke-width="1.2"/><circle cx="261.0" cy="397.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><circle cx="275.0" cy="397.0" r="6" fill="#5A6672" stroke="#39424C" stroke-width="1"/><text x="290.0" y="396.0" font-size="12.5" fill="#0F141A" text-anchor="start" font-weight="700" font-family="ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace">SR04 ECHO</text><text x="290.0" y="414.0" font-size="10.5" fill="#5D6B79" text-anchor="start" font-weight="400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">echo in</text><path d="M192.0,398.0 L236.0,398.0" stroke="#0E7C86" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="192.0" cy="398.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/><circle cx="236.0" cy="398.0" r="4.5" fill="#0E7C86" stroke="none" stroke-width="1.0"/></svg></div><div class="scroll"><table><thead><tr><th>Connect this</th><th>To this</th></tr></thead><tbody><tr><td class="w">ESP32 3V3</td><td class="w">HC-SR04 VCC</td></tr><tr><td class="w">ESP32 GND</td><td class="w">HC-SR04 GND</td></tr><tr><td class="w">ESP32 GPIO13</td><td class="w">HC-SR04 TRIG</td></tr><tr><td class="w">HC-SR04 ECHO</td><td class="w">ESP32 GPIO39 (VN)</td></tr></tbody></table></div><div class="note">Two traps here. <b>VN</b> is the only name Wokwi accepts for GPIO39: type 39 and the wire is silently ignored, the sketch simply never sees a reading. And the sensor is on 3V3 here only because it is simulated &mdash; the hardware build runs it at 5&nbsp;V through a 1k/2k divider, because ESP32 pins are not 5&nbsp;V tolerant.</div></div></div><div class="step" id="w9"><div class="shead"><span class="num ok">9</span><h2>Press play and run the demo</h2></div><div class="body"><ol><li>Hit the green <b>play</b> button. The serial pane prints the limits, then <i>NO calibrated mic attached: this rig makes no dB claim</i>.</li><li>Click the HC-SR04 and set the distance slider to about <b>80&nbsp;cm</b> &rarr; green, <b>PERMITTED @ 28.6 m</b>.</li><li>Now walk the refusals: PERSON, DOG / GOAT, pot past 3, distance under 34&nbsp;cm. Each one turns the green LED red with a reason in serial.</li><li>Leave a target detected for about seven seconds &rarr; amber, escalated.</li></ol><div class="note">The refusals are the pitch. Anything can be built to emit; the argument here is that it mostly decides not to, and says why every time.</div></div></div>
+
+<h2 style="margin-top:38px">Every wire, one table</h2>
+<p style="color:var(--muted);max-width:72ch">Generated from
+<code>hardware/wokwi_simple/diagram.json</code>. If the manual and the simulator
+ever disagree, this table is what the simulator actually has.</p>
+<div class="scroll"><table><thead><tr><th>#</th><th>From</th><th>To</th>
+</tr></thead><tbody><tr><td class="w">1</td><td class="w">ESP32 3V3</td><td class="w">HC-SR04 VCC</td></tr><tr><td class="w">2</td><td class="w">ESP32 GND</td><td class="w">HC-SR04 GND</td></tr><tr><td class="w">3</td><td class="w">ESP32 GPIO13</td><td class="w">HC-SR04 TRIG</td></tr><tr><td class="w">4</td><td class="w">HC-SR04 ECHO</td><td class="w">ESP32 GPIO39 (VN)</td></tr><tr><td class="w">5</td><td class="w">ESP32 GPIO26</td><td class="w">PERMIT LED A</td></tr><tr><td class="w">6</td><td class="w">PERMIT LED C</td><td class="w">ESP32 GND</td></tr><tr><td class="w">7</td><td class="w">ESP32 GPIO27</td><td class="w">REFUSE LED A</td></tr><tr><td class="w">8</td><td class="w">REFUSE LED C</td><td class="w">ESP32 GND</td></tr><tr><td class="w">9</td><td class="w">ESP32 GPIO14</td><td class="w">ESCALATE LED A</td></tr><tr><td class="w">10</td><td class="w">ESCALATE LED C</td><td class="w">ESP32 GND</td></tr><tr><td class="w">11</td><td class="w">ESP32 GPIO25</td><td class="w">Buzzer 1</td></tr><tr><td class="w">12</td><td class="w">Buzzer 2</td><td class="w">ESP32 GND</td></tr><tr><td class="w">13</td><td class="w">ESP32 GPIO32</td><td class="w">PERSON button 1.l</td></tr><tr><td class="w">14</td><td class="w">PERSON button 2.l</td><td class="w">ESP32 GND</td></tr><tr><td class="w">15</td><td class="w">ESP32 GPIO33</td><td class="w">DOG / GOAT button 1.l</td></tr><tr><td class="w">16</td><td class="w">DOG / GOAT button 2.l</td><td class="w">ESP32 GND</td></tr><tr><td class="w">17</td><td class="w">ESP32 GPIO35</td><td class="w">E-STOP button 1.l</td></tr><tr><td class="w">18</td><td class="w">E-STOP button 2.l</td><td class="w">ESP32 GND</td></tr><tr><td class="w">19</td><td class="w">E-STOP button 1.l</td><td class="w">Resistor 10k leg 1</td></tr><tr><td class="w">20</td><td class="w">Resistor 10k leg 2</td><td class="w">ESP32 3V3</td></tr><tr><td class="w">21</td><td class="w">GROUP SIZE VCC</td><td class="w">ESP32 3V3</td></tr><tr><td class="w">22</td><td class="w">GROUP SIZE GND</td><td class="w">ESP32 GND</td></tr><tr><td class="w">23</td><td class="w">GROUP SIZE SIG</td><td class="w">ESP32 GPIO34</td></tr></tbody></table></div>
+
+<p style="color:var(--faint);font-size:13px;margin-top:30px">
+Regenerate with <code>python tools/make_wokwi_steps.py</code>.</p>
+</div>
+<script>
+document.querySelectorAll("button[data-copy]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var pre = document.getElementById(b.dataset.copy);
+    function selectIt() {
+      // clipboard blocked or absent: select it so one keystroke still works
+      var r = document.createRange();
+      r.selectNodeContents(pre);
+      var s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      b.textContent = "Press Ctrl+C";
+    }
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      selectIt();
+      return;
+    }
+    navigator.clipboard.writeText(pre.innerText).then(function () {
+      b.textContent = "Copied";
+      b.classList.add("done");
+      setTimeout(function () {
+        b.textContent = "Copy";
+        b.classList.remove("done");
+      }, 1600);
+    }, selectIt);
+  });
+});
+</script>

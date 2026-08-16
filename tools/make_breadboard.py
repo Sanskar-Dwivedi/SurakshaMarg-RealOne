@@ -14,8 +14,11 @@ WHY THE ESP32 IS NOT DRAWN PIN-BY-PIN
 38-pin boards the silkscreen order varies by vendor. Drawing one vendor's pin
 order as if it were universal would send half the readers to the wrong hole.
 
-So the module is drawn as a block occupying the low columns, and every wire
-that starts at the ESP32 is named by its SILKSCREEN LABEL. That is safe for a
+So the module is not drawn at all. Every wire that starts at the ESP32 is
+named by its SILKSCREEN LABEL instead, which also happens to be correct whether
+the module is seated in the breadboard or sitting beside it on female jumpers -
+and beside it is the common case, because a 1.0 in DevKit covers every free hole
+on one side of a 1.1 in breadboard. That is safe for a
 reason worth knowing: all five holes in a column are the same electrical node,
 so whichever row the header pin sits in, the free holes in that same column and
 same half are already connected to it. Find the label, use its column.
@@ -315,6 +318,10 @@ class Board:
     def feed(self, n: int, label: str, to: tuple[str, int], colour: str) -> None:
         """A wire arriving from the ESP32, drawn as a labelled tab on the left.
 
+        The tab is the ESP32 pin, wherever the module physically sits: seated in
+        the low columns, or off the board on the end of a female-to-male jumper.
+        The drawing deliberately does not decide that for the reader.
+
         Each feed enters on its own row, so the wire is a single straight line
         and no two feeds share a segment. That is legitimate rather than a
         drawing trick: every hole in a column on one side of the channel is the
@@ -336,6 +343,82 @@ class Board:
                 f'aria-label="{esc(title)}"><rect width="{self.w}" '
                 f'height="{self.h}" fill="{PAPER}"/>' + "".join(self.o) + "</svg>")
 
+
+
+# ------------------------------------------------------- a specific board
+#
+# Read off a photographed DOIT ESP32 DevKit V1, 30 pins, USB at the top. This
+# is the one board in the project named concretely, and only because someone
+# held theirs up: every other page names pins and lets you find them, because
+# vendors disagree. If your silkscreen does not match the two columns below,
+# this figure is not your board - go by the labels, not the positions.
+
+DEVKIT_V1_LEFT = ["3V3", "GND", "D15", "D2", "D4", "RX2", "TX2", "D5",
+                  "D18", "D19", "D21", "RX0", "TX0", "D22", "D23"]
+DEVKIT_V1_RIGHT = ["VIN", "GND", "D13", "D12", "D14", "D27", "D26", "D25",
+                   "D33", "D32", "D35", "D34", "VN", "VP", "EN"]
+
+
+def silk(gpio: str) -> str:
+    """GPIO number -> what is actually printed next to the hole."""
+    return {"39": "VN", "36": "VP"}.get(gpio, "D" + gpio)
+
+
+def board_uses(p: dict[str, str]) -> dict[str, str]:
+    """Silkscreen label -> what this build connects to it."""
+    return {
+        "VIN": "HC-SR04 VCC (5 V)",
+        "GND": "the " + chr(8722) + " rail",
+        "3V3": "pot + E-stop pull-up",
+        silk(p["PIN_TRIG"]): "HC-SR04 TRIG",
+        silk(p["PIN_ECHO"]): "divider junction (ECHO)",
+        silk(p["PIN_EMIT"]): "220 " + OHM + " to the piezo",
+        silk(p["LED_PERMIT"]): "220 " + OHM + " to the green LED",
+        silk(p["LED_REFUSE"]): "220 " + OHM + " to the red LED",
+        silk(p["LED_ESCALATE"]): "220 " + OHM + " to the amber LED",
+        silk(p["BTN_PERSON"]): "PERSON button",
+        silk(p["BTN_NONTARGET"]): "DOG / GOAT button",
+        silk(p["BTN_ESTOP"]): "E-STOP button + 10k",
+        silk(p["POT_GROUP"]): "pot wiper (middle leg)",
+        silk(p["LED_ARMED"]): "on-board LED, nothing to wire",
+    }
+
+
+def devkit_figure(p: dict[str, str]) -> str:
+    """The two headers, with the pins this build touches called out."""
+    used = board_uses(p)
+    pitch, x_l, x_r = 34, 300, 560
+    y0 = 128
+    n = len(DEVKIT_V1_LEFT)
+    h = int(y0 + n * pitch + 56)
+    s = Board.__new__(Board)          # reuse the SVG helpers, not the geometry
+    s.w, s.h, s.o, s.p = 980, h, [], 12.0
+    s.show_badges = False
+
+    s.rect(x_l, y0 - 54, x_r - x_l, n * pitch + 54, "#16323A", "#0C2026", rx=10, sw=1.5)
+    s.rect((x_l + x_r) / 2 - 32, y0 - 72, 64, 26, "#B9BEC4", "#8C9198", rx=4)
+    s.txt((x_l + x_r) / 2, y0 - 54, "USB", 10, "#4A5057", anchor="middle", weight="700")
+    s.txt((x_l + x_r) / 2, y0 - 24, "ESP32 DevKit V1  -  30 pin", 12, "#9FD3D9",
+          anchor="middle", weight="700")
+
+    for col, (labels, x, inward, anchor, out_x, out_anchor) in enumerate((
+            (DEVKIT_V1_LEFT, x_l, 16, "start", x_l - 26, "end"),
+            (DEVKIT_V1_RIGHT, x_r, -16, "end", x_r + 26, "start"))):
+        for i, name in enumerate(labels):
+            y = y0 + i * pitch
+            job = used.get(name)
+            pad = "#D9B44A" if job else "#5A6169"
+            s.rect(x - 7, y - 8, 14, 16, pad, rx=2)
+            s.txt(x + inward, y + 5, name, 12,
+                  "#E7F3F5" if job else "#7C868E", anchor=anchor, weight="700")
+            if job:
+                x_pad = x - 7 if col == 0 else x + 7
+                x_end = out_x + (10 if col == 0 else -10)
+                s.wire([(x_pad, y), (x_end, y)], "#D9B44A", 2.2)
+                s.txt(out_x, y + 4, job, 11.5, INK, anchor=out_anchor)
+    s.txt(x_l - 26, y0 + n * pitch + 26,
+          "grey pads are unused by this build", 10.5, FAINT, anchor="end")
+    return s.out("ESP32 DevKit V1 pin map")
 
 # ------------------------------------------------------------------ the steps
 
@@ -655,15 +738,36 @@ top and bottom edge.</p>
 <p><b>A column is a node.</b> All five holes in a column on the same side of the
 centre channel are the same electrical point. Two component legs in the same column
 are connected; the same column on the other side of the channel is a different node.</p>
-<p><b>The ESP32 is not drawn pin by pin, on purpose.</b> 30-pin and 38-pin DevKits
-order their headers differently, and vendors differ even within 38 pins. Find each
-pin by its <b>silkscreen label</b>, then use any free hole in that pin's column on
-that side of the board &mdash; it is the same node as the pin. Put the module over
-the low columns (roughly 1&ndash;20) so columns {lo}+ stay free for parts.</p>
+<p><b>Where the ESP32 goes: most likely beside the board, not in it.</b>
+A breadboard is 1.1&nbsp;in from row A to row J. A 1.0&nbsp;in DevKit pushed into it
+leaves <b>zero</b> free holes on one side, so half its pins become unreachable. A
+0.9&nbsp;in DevKit fits with headers in rows <b>B and I</b>, leaving exactly one free
+hole per pin (row A below, row J above). Measure yours before you commit: count the
+holes between the two header rows.</p>
+<p><b>The reliable option, and the one this guide assumes:</b> leave the ESP32 off the
+breadboard and use <b>female-to-male jumpers</b> &mdash; female end pushed onto the
+ESP32 header pin, male end into the hole named in the table. Nothing else changes;
+every ESP32 connection here is already written as &ldquo;from this labelled pin, to
+this hole&rdquo;. It also removes the risk of bending pins on a board you cannot
+replace tonight. If you do seat the module in a breadboard, put it over columns
+1&ndash;20 so columns {lo}+ stay clear for parts.</p>
+<p><b>Pins are named, never counted.</b> 30-pin and 38-pin DevKits order their headers
+differently and vendors differ even within 38 pins, which is why no pin order is drawn
+anywhere on this page. Find each pin by its <b>silkscreen label</b>. If the module is
+seated in the board, any free hole in that pin's column on that side is the same
+electrical node as the pin.</p>
 <p><b>Board size.</b> This layout assumes a full-size 63-column breadboard. On a
 half-size 30-column board, put the ESP32 on one board and the parts on a second,
 and carry the two rails across with a pair of jumpers.</p>
 </div>
+
+<h2 style="margin-top:34px">Your board, pin by pin</h2>
+<p style="color:var(--muted);max-width:74ch">This is a <b>DOIT ESP32 DevKit V1,
+30&nbsp;pin</b>, drawn with the USB at the top. Gold pads are the ones this build
+touches. Note the silkscreen writes <b>D26</b>, not GPIO26, and <b>VN</b> for
+GPIO39. Every signal wire lands on the <b>right-hand header</b>; only 3V3 is on
+the left.</p>
+<div class="pic">{devkit}</div>
 
 <h2 style="margin-top:34px">Parts</h2>
 <div class="scroll"><table><thead><tr><th>Qty</th><th>Part</th><th>Where it lands</th>
@@ -727,7 +831,8 @@ def main() -> None:
             f'<div class="{ncls}">{note}</div></div></div>')
 
     page = PAGE.format(rail=rail_html, parts=parts_html,
-                       steps="".join(blocks), lo=COL_LO)
+                       steps="".join(blocks), lo=COL_LO,
+                       devkit=devkit_figure(p))
     page = "".join(c if ord(c) < 128 else f"&#{ord(c)};" for c in page)
     out = ROOT / "hardware" / "breadboard.html"
     out.write_text(page, encoding="utf-8")

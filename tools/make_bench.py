@@ -1,0 +1,839 @@
+"""
+Generate the on-screen bench: the physical rig, in a browser.
+
+    python tools/make_bench.py
+
+Same panel, same governor, no hardware. Three status LEDs, an armed heartbeat,
+an emitter, three veto buttons, a group knob and a distance control - and the
+same state machine deciding between them.
+
+WHY THIS IS NOT A MOCK-UP
+-------------------------
+Every limit below is parsed out of hardware/wokwi_esp32/gaukavach_esp32.ino at
+build time and injected into the page, so the browser cannot enforce a rule the
+firmware does not, or miss one that it does. A test compares the two.
+
+That distinction is the whole reason this page is worth showing. An animation
+of some LEDs proves nothing; a second implementation of the same rule set,
+provably in step with the first, is the thing being claimed.
+"""
+
+from __future__ import annotations
+
+import html
+import json
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ESP = ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino"
+
+WANTED = ("MAX_GROUP", "MAX_ACTIVATION_MS", "MIN_SILENCE_MS", "DAILY_BUDGET_MS",
+          "ESCALATE_AFTER_MS", "MAX_ATTEMPTS", "CARRIER_HZ", "DEMO_SPEED",
+          "RAMP_MS", "DESK_SCALE", "RANGE_MAX_M", "LINE_M")
+
+
+def esc(s) -> str:
+    t = html.escape(str(s), quote=True)
+    return "".join(c if ord(c) < 128 else f"&#{ord(c)};" for c in t)
+
+
+def consts() -> dict[str, float]:
+    src = ESP.read_text(encoding="utf-8")
+    out: dict[str, float] = {}
+    for n in WANTED:
+        m = re.search(rf"\b{n}\s*=\s*([\d.]+)", src)
+        if not m:
+            raise SystemExit(f"{n} not found in {ESP.name}")
+        out[n] = float(m.group(1))
+    return out
+
+
+def pins() -> dict[str, str]:
+    src = ESP.read_text(encoding="utf-8")
+    out = {}
+    for n in ("PIN_EMIT", "LED_PERMIT", "LED_REFUSE", "LED_ESCALATE", "LED_ARMED",
+              "BTN_PERSON", "BTN_NONTARGET", "BTN_ESTOP", "POT_GROUP",
+              "PIN_TRIG", "PIN_ECHO"):
+        m = re.search(rf"\b{n}\s*=\s*(\d+)", src)
+        if not m:
+            raise SystemExit(f"{n} not found in {ESP.name}")
+        out[n] = m.group(1)
+    return out
+
+
+PAGE = """<title>GauKavach - the bench, on screen</title>
+<style>
+:root{{--ground:#EDF0F3;--surface:#FFFFFF;--ink:#0F141A;--body:#28323C;--muted:#5D6B79;
+--faint:#8695A3;--line:#D2DAE1;--accent:#0E7C86;--ok:#1C7A4B;--ok-bg:#E2F1E8;
+--warn:#93670A;--warn-bg:#F8EFD8;--crit:#A9291F;--crit-bg:#F8E4E2;--surface-2:#F5F8FA;
+--panel:#16212A;--panel-2:#0E171E;--panel-line:#2B3B47;}}
+@media (prefers-color-scheme:dark){{:root:not([data-theme="light"]){{--ground:#0C1116;
+--surface:#131A21;--ink:#E9EEF3;--body:#C3CFD9;--muted:#8FA0AE;--faint:#6B7C8A;
+--line:#212C36;--accent:#40B9C2;--ok:#5FBF8A;--ok-bg:#12291E;--warn:#D9A63C;
+--warn-bg:#2C2314;--crit:#E0776C;--crit-bg:#2E1815;--surface-2:#182028;}}}}
+:root[data-theme="dark"]{{--ground:#0C1116;--surface:#131A21;--ink:#E9EEF3;
+--body:#C3CFD9;--muted:#8FA0AE;--faint:#6B7C8A;--line:#212C36;--accent:#40B9C2;
+--ok:#5FBF8A;--ok-bg:#12291E;--warn:#D9A63C;--warn-bg:#2C2314;--crit:#E0776C;
+--crit-bg:#2E1815;--surface-2:#182028;}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--ground);color:var(--body);
+font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.6}}
+h1,h2{{font-family:Charter,"Bitstream Charter",Georgia,serif;color:var(--ink);margin:0}}
+.wrap{{max-width:1180px;margin:0 auto;padding:0 22px 70px}}
+header{{background:var(--surface);border-bottom:1px solid var(--line);padding:26px 0 22px;
+margin-bottom:22px}}
+.eyebrow{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}}
+h1{{font-size:29px;margin-top:6px}}
+.lede{{max-width:76ch;margin-top:10px;color:var(--muted);font-size:14.5px}}
+
+.grid{{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;
+align-items:start}}
+@media (max-width:940px){{.grid{{grid-template-columns:1fr}}}}
+
+.panel{{background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;
+padding:20px 22px 22px;color:#C9D6DE}}
+.panel h2{{color:#DCE9EE;font-size:17px;font-family:ui-monospace,Menlo,Consolas,monospace;
+letter-spacing:.06em;text-transform:uppercase}}
+.lamps{{display:flex;gap:26px;align-items:flex-end;margin:20px 0 6px;flex-wrap:wrap}}
+.lamp{{text-align:center;width:78px}}
+.bulb{{width:46px;height:46px;border-radius:50%;margin:0 auto 8px;position:relative;
+background:#20303B;border:2px solid #33454F;transition:background .08s,box-shadow .08s}}
+.bulb.on{{box-shadow:0 0 26px 5px var(--glow),0 0 8px 1px var(--glow) inset;
+background:var(--glow);border-color:var(--glow)}}
+.bulb.beat{{animation:heartbeat 1.6s ease-in-out infinite}}
+@keyframes heartbeat{{
+  0%,100%{{background:#20303B;border-color:#33454F;box-shadow:none}}
+  45%,55%{{background:var(--glow);border-color:var(--glow);
+    box-shadow:0 0 26px 5px var(--glow),0 0 8px 1px var(--glow) inset}}
+}}
+.lamp span{{display:block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;
+letter-spacing:.08em;color:#7E93A0}}
+.lamp b{{display:block;font-size:11.5px;color:#B9CBD5;margin-bottom:2px}}
+
+.emit{{margin-top:14px;border-top:1px solid var(--panel-line);padding-top:16px}}
+.emitrow{{display:flex;align-items:center;gap:16px}}
+.horn{{width:52px;height:52px;border-radius:50%;background:#20303B;border:2px solid #33454F;
+display:grid;place-items:center;position:relative;flex:none}}
+.horn i{{display:block;width:14px;height:14px;border-radius:50%;background:#33454F}}
+.horn.live{{border-color:#40B9C2}}
+.horn.live i{{background:#40B9C2}}
+.ring{{position:absolute;inset:-6px;border-radius:50%;border:2px solid #40B9C2;opacity:0;}}
+.horn.live .ring{{animation:pulse 1s linear infinite}}
+@keyframes pulse{{from{{transform:scale(.85);opacity:.75}} to{{transform:scale(1.5);opacity:0}}}}
+.meter{{flex:1}}
+.bar{{height:9px;background:#0D1920;border:1px solid #2B3B47;border-radius:5px;overflow:hidden}}
+.bar i{{display:block;height:100%;width:0;background:linear-gradient(90deg,#0E7C86,#40B9C2);
+transition:width .06s linear}}
+.mono{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:#8FA6B3}}
+
+.ctl{{margin-top:18px;border-top:1px solid var(--panel-line);padding-top:16px}}
+.ctl label{{display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,Consolas,monospace;
+font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8FA6B3;margin-bottom:7px}}
+.ctl label b{{color:#DCE9EE;text-transform:none;letter-spacing:0;font-size:13px}}
+/* accent-color alone leaves a hairline thumb on a pale track, which does not
+   read as a control at all - the first person to use this page could not tell
+   the sliders were draggable. Drawn explicitly instead. */
+input[type=range]{{-webkit-appearance:none;appearance:none;width:100%;height:26px;
+background:transparent;cursor:grab;margin:0;display:block}}
+input[type=range]:active{{cursor:grabbing}}
+input[type=range]::-webkit-slider-runnable-track{{height:8px;border-radius:5px;
+background:#0B1720;border:1px solid #2F4552}}
+input[type=range]::-webkit-slider-thumb{{-webkit-appearance:none;appearance:none;
+width:26px;height:26px;margin-top:-10px;border-radius:50%;background:#40B9C2;
+border:3px solid #0B1116;box-shadow:0 0 0 3px rgba(64,185,194,.28)}}
+input[type=range]::-moz-range-track{{height:8px;border-radius:5px;
+background:#0B1720;border:1px solid #2F4552}}
+input[type=range]::-moz-range-thumb{{width:20px;height:20px;border-radius:50%;
+background:#40B9C2;border:3px solid #0B1116}}
+.presets{{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 14px}}
+.chip{{border:1px solid #3A4C58;background:#1A2831;color:#A8BECA;border-radius:999px;
+padding:5px 12px;cursor:pointer;font-family:ui-monospace,Menlo,Consolas,monospace;
+font-size:11px}}
+.chip:hover{{border-color:#40B9C2;color:#DCEEF2}}
+.chip.on{{background:#0E7C86;border-color:#40B9C2;color:#fff}}
+.zones{{display:flex;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;
+color:#6B8290;justify-content:space-between;margin-bottom:14px}}
+.btns{{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}}
+.btn{{flex:1 1 130px;border:1px solid #3A4C58;background:#1D2B34;color:#C9D6DE;
+padding:13px 10px;border-radius:8px;cursor:pointer;font-family:ui-monospace,Menlo,Consolas,monospace;
+font-size:12px;letter-spacing:.05em;user-select:none;text-align:center}}
+.btn:hover{{border-color:#4E6472}}
+.btn.held{{background:#2E4450;border-color:#40B9C2;color:#fff}}
+.btn.stop{{border-color:#6E2A24;background:#2A1614;color:#E0776C}}
+.btn.stop.held,.btn.stop.latched{{background:#8E2A20;border-color:#C0392B;color:#fff}}
+.btn small{{display:block;font-size:9.5px;color:#7E93A0;margin-top:3px;letter-spacing:0}}
+.btn.held small,.btn.stop.latched small{{color:#CBDDE4}}
+
+.side{{display:flex;flex-direction:column;gap:14px}}
+.card{{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px}}
+.card h2{{font-size:16px;margin-bottom:4px}}
+.state{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:22px;font-weight:700;
+letter-spacing:.04em}}
+.reason{{font-size:14px;color:var(--muted);margin-top:4px;min-height:2.6em}}
+#log{{background:#0E171E;color:#B7C9D3;border:1px solid var(--panel-line);border-radius:8px;
+padding:12px 14px;height:330px;overflow-y:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+font-size:11.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}}
+#log .p{{color:#5FBF8A}} #log .r{{color:#E0776C}} #log .e{{color:#D9A63C}}
+#log .d{{color:#40B9C2}} #log .m{{color:#7E93A0}}
+table{{border-collapse:collapse;width:100%;font-size:13px}}
+td{{padding:5px 0;border-bottom:1px solid var(--line)}}
+td.k{{color:var(--muted)}} td.v{{font-family:ui-monospace,Menlo,Consolas,monospace;
+color:var(--ink);text-align:right;white-space:nowrap}}
+.note{{margin-top:20px;padding:14px 17px;border-left:3px solid var(--accent);
+background:var(--surface);border:1px solid var(--line);font-size:13.5px;max-width:92ch}}
+.note b{{color:var(--ink)}}
+.foot{{color:var(--faint);font-size:12.5px;margin-top:24px}}
+.run{{border:2px solid var(--accent);background:var(--surface);border-radius:10px;
+padding:16px 20px;margin-bottom:18px;display:flex;gap:18px;align-items:center;
+flex-wrap:wrap}}
+.run button{{border:none;background:var(--accent);color:#fff;font-size:15px;
+font-weight:600;padding:13px 26px;border-radius:8px;cursor:pointer;flex:none;
+font-family:inherit}}
+.run button:hover{{filter:brightness(1.12)}}
+.run button.stop{{background:var(--crit)}}
+.run button.linked{{background:var(--ok)}}
+.runtxt{{flex:1;min-width:260px}}
+.runtxt b{{display:block;color:var(--ink);font-size:16px;line-height:1.4}}
+.runtxt span{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}}
+.dots{{display:flex;gap:5px;margin-top:9px}}
+.dots i{{width:22px;height:4px;border-radius:2px;background:var(--line);display:block}}
+.dots i.done{{background:var(--accent)}}
+.dots i.now{{background:var(--ink)}}
+</style>
+<header><div class="wrap">
+<div class="eyebrow">Bench governor &mdash; software</div>
+<h1>The rig, on screen</h1>
+<p class="lede">The same panel as the hardware build: three status lamps, an armed
+heartbeat, an emitter, three veto buttons and a group knob. Move the distance
+control to bring an animal in. Every limit on this page is read out of
+<code>gaukavach_esp32.ino</code> when the page is generated, so the browser
+enforces the firmware's rules rather than an approximation of them.</p>
+</div></header>
+<div class="wrap">
+<div class="run">
+  <button id="runBtn">Run the demo</button>
+  <button id="linkBtn" style="background:var(--ink)">Connect the board</button>
+  <div class="runtxt">
+    <span id="runStep">nine beats, about a minute</span>
+    <b id="runSay">Press play and narrate. It drives itself, so you can watch
+    the room instead of the controls.</b>
+    <div class="dots" id="runDots"></div>
+  </div>
+</div>
+
+<div class="grid">
+
+<div class="panel">
+<h2>Panel</h2>
+<div class="lamps">
+  <div class="lamp"><div class="bulb" id="lampPermit" style="--glow:#2ECC71"></div>
+    <b>PERMIT</b><span>GPIO{permit}</span></div>
+  <div class="lamp"><div class="bulb" id="lampRefuse" style="--glow:#E74C3C"></div>
+    <b>REFUSE</b><span>GPIO{refuse}</span></div>
+  <div class="lamp"><div class="bulb" id="lampEsc" style="--glow:#F1C40F"></div>
+    <b>ESCALATE</b><span>GPIO{escalate}</span></div>
+  <div class="lamp"><div class="bulb" id="lampArmed" style="--glow:#3498DB"></div>
+    <b>ARMED</b><span>GPIO{armed}</span></div>
+</div>
+
+<div class="emit"><div class="emitrow">
+  <div class="horn" id="horn"><span class="ring"></span><i></i></div>
+  <div class="meter">
+    <div class="mono" style="display:flex;justify-content:space-between">
+      <span>EMITTER &mdash; GPIO{emit}, {carrier} kHz</span><span id="dutyTxt">idle</span></div>
+    <div class="bar"><i id="duty"></i></div>
+    <div class="mono" style="margin-top:6px">raised-cosine envelope, {ramp} ms ramp</div>
+  </div>
+</div></div>
+
+<div class="ctl">
+  <label>Distance to animal <b><span id="cmTxt">200</span> cm
+    &rarr; <span id="mTxt">--</span></b></label>
+  <input type="range" id="dist" min="0" max="200" step="1" value="200">
+  <div class="zones"><span>0</span><span id="zLine">carriageway</span>
+    <span id="zBand">permit band</span><span>200 cm</span></div>
+  <div class="presets" id="dPresets">
+    <span class="chip" data-d="0">gone</span>
+    <span class="chip" data-d="20">20 cm &mdash; at the road</span>
+    <span class="chip" data-d="80">80 cm &mdash; permit</span>
+    <span class="chip" data-d="160">160 cm &mdash; too far</span>
+  </div>
+
+  <label>Group size <b><span id="grpTxt">1</span> animals</b></label>
+  <input type="range" id="grp" min="1" max="8" step="1" value="1">
+  <div class="zones"><span>1</span><span>limit is {maxgroup}</span><span>8</span></div>
+  <div class="presets" id="gPresets">
+    <span class="chip" data-g="1">1 &mdash; single animal</span>
+    <span class="chip" data-g="5">5 &mdash; herd, refuses</span>
+  </div>
+
+  <div class="btns">
+    <div class="btn" id="bPerson">PERSON<small>hold &mdash; key 1</small></div>
+    <div class="btn" id="bNon">DOG / GOAT<small>hold &mdash; key 2</small></div>
+    <div class="btn stop" id="bStop">E-STOP<small>click to latch &mdash; key 3</small></div>
+    <div class="btn" id="bReset">RESET<small>reboots the board</small></div>
+  </div>
+</div>
+</div>
+
+<div class="side">
+  <div class="card">
+    <h2>Decision</h2>
+    <div class="state" id="stateTxt">IDLE</div>
+    <div class="reason" id="reasonTxt">Nothing detected.</div>
+  </div>
+  <div class="card">
+    <h2>Governor</h2>
+    <table><tbody>
+      <tr><td class="k">Attempts this incident</td><td class="v" id="mAtt">0 / {maxatt}</td></tr>
+      <tr><td class="k">Exposure budget used</td><td class="v" id="mBud">0.0 / {budget} s</td></tr>
+      <tr><td class="k">Quiet period remaining</td><td class="v" id="mQuiet">--</td></tr>
+      <tr><td class="k">Time to escalation</td><td class="v" id="mEsc">--</td></tr>
+    </tbody></table>
+  </div>
+  <div id="log"></div>
+</div>
+</div>
+
+<div class="note">
+<p><b>This is the firmware's rule set, not a drawing of it.</b> The limits, the
+scale factor and the demo time compression are parsed from
+<code>gaukavach_esp32.ino</code> at build time, and a test in the repository
+fails if this page and the sketch ever disagree. What you can drive here, you
+could drive on the bench, and it would refuse for the same reasons.</p>
+<p><b>What it still does not claim.</b> No sound is produced and no decibel
+figure is shown, because there is no calibrated microphone anywhere in this
+project. The emitter bar is drive duty, not acoustic output. Timers run
+{speed}x faster than the shipped values so a full cycle fits in a demo; both
+figures are in the table below.</p>
+</div>
+
+<div class="card" style="margin-top:16px">
+<h2>Limits in force</h2>
+<table><tbody>{limits}</tbody></table>
+</div>
+
+<p class="foot">Regenerate with <code>python tools/make_bench.py</code>.</p>
+</div>
+<script>
+const K = {consts};
+
+const el = (id) => document.getElementById(id);
+const lamp = {{permit: el("lampPermit"), refuse: el("lampRefuse"),
+               esc: el("lampEsc"), armed: el("lampArmed")}};
+const horn = el("horn"), duty = el("duty"), dutyTxt = el("dutyTxt");
+const log = el("log");
+
+const scaled = (ms) => ms / K.DEMO_SPEED;
+
+let S = {{}};
+function boot(quiet) {{
+  S = {{
+    state: "IDLE", estop: false, doNotEmit: false,
+    attempts: 0, incidentStart: 0, emitStartedAt: 0,
+    lastEmissionEnd: -1e9, exposureUsed: 0,
+    lastPrint: 0, lastBeat: 0, armed: false,
+    envelope: 0, envDir: 0, reason: "Nothing detected."
+  }};
+  if (!quiet) {{
+    log.innerHTML = "";
+    say("m", "GauKavach bench governor - software bench");
+    say("m", "carrier " + K.CARRIER_HZ + " Hz, raised-cosine " + K.RAMP_MS + " ms ramp");
+    say("m", "max activation " + (K.MAX_ACTIVATION_MS/1000).toFixed(1) + " s (demo "
+             + (scaled(K.MAX_ACTIVATION_MS)/1000).toFixed(1) + " s)");
+    say("m", "max group " + K.MAX_GROUP + ", max attempts " + K.MAX_ATTEMPTS);
+    say("m", "NO calibrated mic attached: this rig makes no dB claim");
+  }}
+}}
+
+function say(cls, text) {{
+  const line = document.createElement("div");
+  line.className = cls;
+  line.textContent = text;
+  log.appendChild(line);
+  while (log.childNodes.length > 300) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}}
+
+// ---- inputs
+const dist = el("dist"), grp = el("grp");
+let person = false, nonTarget = false;
+
+function bindHold(node, set) {{
+  const on = (e) => {{ e.preventDefault(); set(true); node.classList.add("held"); }};
+  const off = () => {{ set(false); node.classList.remove("held"); }};
+  node.addEventListener("pointerdown", on);
+  node.addEventListener("pointerup", off);
+  node.addEventListener("pointerleave", off);
+  node.addEventListener("pointercancel", off);
+}}
+bindHold(el("bPerson"), (v) => person = v);
+bindHold(el("bNon"), (v) => nonTarget = v);
+
+document.querySelectorAll("[data-d]").forEach((c) => {{
+  c.addEventListener("click", () => {{ dist.value = c.dataset.d; }});
+}});
+document.querySelectorAll("[data-g]").forEach((c) => {{
+  c.addEventListener("click", () => {{ grp.value = c.dataset.g; }});
+}});
+
+el("bStop").addEventListener("click", () => {{ S.estop = true; }});
+el("bReset").addEventListener("click", () => {{
+  boot(false);
+  dist.value = 200; grp.value = 1;
+  person = false; nonTarget = false;
+  el("bPerson").classList.remove("held");
+  el("bNon").classList.remove("held");
+  boardToRest();
+  say("m", "--- board reset ---");
+}});
+addEventListener("keydown", (e) => {{
+  if (e.repeat) return;
+  if (e.key === "1") {{ person = true; el("bPerson").classList.add("held"); }}
+  if (e.key === "2") {{ nonTarget = true; el("bNon").classList.add("held"); }}
+  if (e.key === "3") S.estop = true;
+}});
+addEventListener("keyup", (e) => {{
+  if (e.key === "1") {{ person = false; el("bPerson").classList.remove("held"); }}
+  if (e.key === "2") {{ nonTarget = false; el("bNon").classList.remove("held"); }}
+}});
+
+// ---- the governor, mirroring loop() in gaukavach_esp32.ino
+function leds(p, r, e) {{
+  lamp.permit.classList.toggle("on", p);
+  lamp.refuse.classList.toggle("on", r);
+  lamp.esc.classList.toggle("on", e);
+}}
+
+function stopEmitting(why) {{
+  if (S.state === "EMITTING") {{
+    const dur = now() - S.emitStartedAt;
+    S.exposureUsed += dur;
+    S.lastEmissionEnd = now();
+    say("m", "  emission ended after " + Math.round(dur) + " ms - " + why);
+    if (S.exposureUsed >= scaled(K.DAILY_BUDGET_MS)) {{
+      S.doNotEmit = true;
+      say("r", "  DAILY EXPOSURE BUDGET EXHAUSTED -> do-not-emit latched");
+    }}
+  }}
+  S.envDir = -1;
+}}
+
+const t0 = performance.now();
+const now = () => performance.now() - t0;
+
+function tick() {{
+  const t = now();
+  const cm = +dist.value;
+  const group = +grp.value;
+
+  el("cmTxt").textContent = cm;
+  el("grpTxt").textContent = group;
+  mirror(cm, group);
+  document.querySelectorAll("[data-d]").forEach(
+    (c) => c.classList.toggle("on", +c.dataset.d === cm));
+  document.querySelectorAll("[data-g]").forEach(
+    (c) => c.classList.toggle("on", +c.dataset.g === group));
+
+  if (S.estop) {{
+    stopEmitting("E-STOP");
+    S.state = "INHIBITED";
+    leds(false, true, false);
+    lamp.armed.classList.remove("on");
+    lamp.armed.classList.remove("beat");
+    el("bStop").classList.add("latched");
+    if (t - S.lastPrint > 1000) {{
+      say("r", "E-STOP LATCHED - emitter dead until reset");
+      S.lastPrint = t;
+    }}
+    S.reason = "Emergency stop is latched. Press RESET to reboot the board.";
+    return paint(cm, group);
+  }}
+  el("bStop").classList.remove("latched");
+
+  lamp.armed.classList.add("beat");    // CSS runs it; see @keyframes heartbeat
+
+  const seen = cm > 0 && cm < 200;
+  const metres = seen ? cm / K.DESK_SCALE : 999;
+
+  if (S.state === "EMITTING" && (t - S.emitStartedAt) >= scaled(K.MAX_ACTIVATION_MS)) {{
+    stopEmitting("WATCHDOG max activation");
+    S.state = "COOLDOWN";
+  }}
+
+  if (!seen) {{
+    if (S.state === "EMITTING") stopEmitting("target lost");
+    if (S.state !== "INHIBITED") S.state = "IDLE";
+    S.attempts = 0; S.incidentStart = 0;
+    leds(false, false, false);
+    S.reason = "Nothing detected.";
+    return paint(cm, group);
+  }}
+
+  if (S.incidentStart === 0) {{
+    S.incidentStart = t;
+    say("d", "DETECTION at " + metres.toFixed(1) + " m (scaled)");
+  }}
+
+  let deny = null;
+  if (S.doNotEmit)                  deny = "animal is on the do-not-emit list";
+  else if (person)                  deny = "a person is inside the exposure cone";
+  else if (nonTarget)               deny = "a non-target species is inside the cone";
+  else if (group > K.MAX_GROUP)     deny = "group large enough that a startle could cascade";
+  else if (metres > K.RANGE_MAX_M)  deny = "beyond the acoustic envelope";
+  else if (metres <= K.LINE_M)      deny = "already at the carriageway - fleeing would cross it";
+  else if (S.state === "COOLDOWN" &&
+           (t - S.lastEmissionEnd) < scaled(K.MIN_SILENCE_MS))
+                                    deny = "enforced quiet period";
+
+  const timedOut = (t - S.incidentStart) > scaled(K.ESCALATE_AFTER_MS);
+  if (S.state !== "EMITTING" && (S.attempts >= K.MAX_ATTEMPTS || timedOut)) {{
+    if (S.state !== "ESCALATED") {{
+      stopEmitting("escalating");
+      say("e", "  ESCALATED -> traffic warning + human dispatch");
+      say("e", "  (acoustic cues are not stock-proof; the system stops)");
+      S.state = "ESCALATED";
+    }}
+    leds(false, false, true);
+    S.reason = "Gave up and asked for a human. Acoustic cues are not stock-proof.";
+    return paint(cm, group);
+  }}
+
+  if (deny !== null) {{
+    if (S.state === "EMITTING") stopEmitting(deny);
+    S.state = (S.state === "COOLDOWN") ? "COOLDOWN" : "TRACKING";
+    leds(false, true, false);
+    if (t - S.lastPrint > 800) {{
+      say("r", "REFUSED @ " + metres.toFixed(1) + " m  group=" + group + "  -> " + deny);
+      S.lastPrint = t;
+    }}
+    S.reason = "Refused: " + deny + ".";
+    return paint(cm, group);
+  }}
+
+  if (S.state !== "EMITTING") {{
+    S.state = "EMITTING";
+    S.emitStartedAt = t;
+    S.attempts++;
+    S.envDir = 1;
+    say("p", "PERMITTED @ " + metres.toFixed(1) + " m  attempt " + S.attempts + "/"
+             + K.MAX_ATTEMPTS + "  carrier " + (K.CARRIER_HZ/1000).toFixed(1) + " kHz");
+  }}
+  leds(true, false, false);
+  S.reason = "Emitting. Every veto above was checked first.";
+  paint(cm, group);
+}}
+
+function paint(cm, group) {{
+  const t = now();
+  const metres = (cm > 0 && cm < 200) ? cm / K.DESK_SCALE : null;
+  el("mTxt").textContent = metres === null ? "out of view" : metres.toFixed(1) + " m";
+
+  // raised-cosine envelope, the same shape the LEDC duty follows
+  const stepPer = 1000 / 60 / K.RAMP_MS;
+  if (S.envDir > 0) S.envelope = Math.min(1, S.envelope + stepPer);
+  else if (S.envDir < 0) S.envelope = Math.max(0, S.envelope - stepPer);
+  const e = 0.5 * (1 - Math.cos(Math.PI * S.envelope));
+  const live = e > 0.01;
+  horn.classList.toggle("live", live);
+  duty.style.width = (e * 100).toFixed(1) + "%";
+  dutyTxt.textContent = live ? (e * 50).toFixed(0) + "% duty" : "idle";
+
+  el("stateTxt").textContent = S.state;
+  el("stateTxt").style.color =
+      S.state === "EMITTING" ? "var(--ok)" :
+      S.state === "ESCALATED" ? "var(--warn)" :
+      (S.state === "INHIBITED" || S.state === "TRACKING" || S.state === "COOLDOWN")
+        ? "var(--crit)" : "var(--muted)";
+  el("reasonTxt").textContent = S.reason;
+
+  el("mAtt").textContent = S.attempts + " / " + K.MAX_ATTEMPTS;
+  el("mBud").textContent = (S.exposureUsed / 1000).toFixed(1) + " / "
+      + (scaled(K.DAILY_BUDGET_MS) / 1000).toFixed(0) + " s";
+  const quiet = scaled(K.MIN_SILENCE_MS) - (t - S.lastEmissionEnd);
+  el("mQuiet").textContent = (S.state === "COOLDOWN" && quiet > 0)
+      ? (quiet / 1000).toFixed(1) + " s" : "--";
+  const toEsc = scaled(K.ESCALATE_AFTER_MS) - (t - S.incidentStart);
+  el("mEsc").textContent = (S.incidentStart && toEsc > 0 && S.state !== "ESCALATED")
+      ? (toEsc / 1000).toFixed(1) + " s" : "--";
+}}
+
+/* ---- the board bridge ----
+ *
+ * Drives the real ESP32 from this page over USB, so the physical lamps follow
+ * the on-screen ones. The firmware already accepts every input as a typed
+ * command, which is what makes this possible at all - the page just types
+ * faster than a person.
+ *
+ * Only differences are sent. The governor on the board then reaches its own
+ * verdict from those inputs; this page never tells it what to decide. That
+ * distinction matters if anyone asks: two independent implementations agreeing,
+ * not one puppeting the other.
+ *
+ * Web Serial needs a secure context, so this works from http://127.0.0.1 and
+ * not from a file:// page or an embedded frame. Use the launcher.
+ */
+let port = null, writer = null;
+let sent = {{d: null, g: null, p: false, n: false, e: false}};
+let lastSend = 0;
+const enc = new TextEncoder();
+
+function txt(line) {{
+  if (!writer) return;
+  writer.write(enc.encode(line + "\\n")).catch(() => {{}});
+}}
+
+async function readLoop() {{
+  const dec = new TextDecoder();
+  let buf = "";
+  while (port && port.readable) {{
+    const reader = port.readable.getReader();
+    try {{
+      for (;;) {{
+        const {{value, done}} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {{stream: true}});
+        let i;
+        while ((i = buf.indexOf("\\n")) >= 0) {{
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 1);
+          if (line) say("m", "board: " + line);
+        }}
+      }}
+    }} catch (e) {{
+      break;
+    }} finally {{
+      reader.releaseLock();
+    }}
+  }}
+}}
+
+async function linkBoard() {{
+  if (port) {{
+    try {{ writer.releaseLock(); await port.close(); }} catch (e) {{}}
+    port = null; writer = null;
+    el("linkBtn").textContent = "Connect the board";
+    el("linkBtn").classList.remove("linked");
+    say("m", "board disconnected");
+    return;
+  }}
+  if (!("serial" in navigator)) {{
+    say("r", "This page cannot reach a serial port here. Web Serial needs "
+           + "Chrome or Edge, served from http://127.0.0.1 - use the launcher.");
+    return;
+  }}
+  try {{
+    port = await navigator.serial.requestPort();
+    await port.open({{baudRate: 115200}});
+    writer = port.writable.getWriter();
+    readLoop();
+    el("linkBtn").textContent = "Board connected";
+    el("linkBtn").classList.add("linked");
+    say("p", "board connected - the real lamps now follow this page");
+    sent = {{d: null, g: null, p: false, n: false, e: false}};
+    txt("r");
+  }} catch (e) {{
+    say("r", "could not open the port: " + e.message
+           + " (close the Arduino Serial Monitor first)");
+    port = null; writer = null;
+  }}
+}}
+
+function mirror(cm, group) {{
+  if (!writer) return;
+  const now = performance.now();
+  if (now - lastSend < 120) return;      // dragging a slider must not flood it
+  lastSend = now;
+  if (cm !== sent.d)        {{ sent.d = cm;        txt("d" + cm); }}
+  if (group !== sent.g)     {{ sent.g = group;     txt("g" + group); }}
+  if (person !== sent.p)    {{ sent.p = person;    txt("p"); }}
+  if (nonTarget !== sent.n) {{ sent.n = nonTarget; txt("n"); }}
+  if (S.estop !== sent.e)   {{ sent.e = S.estop;   txt(S.estop ? "e" : "r"); }}
+}}
+
+el("linkBtn").addEventListener("click", linkBoard);
+
+/* A guided run.
+ *
+ * Presenting means narrating, and narrating while hunting for the right
+ * control is how a good demo turns into a fumble. The beats below are the
+ * argument in order - detect, then every reason the system declines - and each
+ * one carries the line to say while it is on screen. */
+const DEMO = [
+  [3000, "The road is clear", "Nothing detected. The system is armed and quiet."],
+  [12000, "An animal approaches",
+   "Detected at 28 metres. It permits - then cuts itself off after six "
+   + "seconds, waits out the quiet period, and tries again. Every green "
+   + "flash is a fresh decision.", "pulse"],
+  [5200, "A person is in the cone",
+   "Absolute veto. Emission stops mid-burst, and it says why."],
+  [7000, "The person leaves",
+   "Clear again, so it goes straight back to permitting.", "pulse"],
+  [5200, "A herd, not one animal",
+   "Five together. A startle can cascade into the road, so it refuses."],
+  [5200, "Already at the carriageway",
+   "Too close. Fleeing from here would mean crossing the road."],
+  [5000, "Beyond the envelope",
+   "Out of range. It will not pretend to act at a distance it cannot reach."],
+  [9000, "It gives up",
+   "Three attempts, then it stops and asks for a human. Acoustic cues are "
+   + "not stock-proof and this does not pretend otherwise."],
+  [4200, "Emergency stop", "Dead until reset, independent of everything above."],
+];
+
+let demoAt = -1, demoTimer = null, pulseTimer = null;
+
+function demoDots() {{
+  const d = el("runDots");
+  d.innerHTML = "";
+  DEMO.forEach((_, i) => {{
+    const b = document.createElement("i");
+    if (i < demoAt) b.className = "done";
+    if (i === demoAt) b.className = "now";
+    d.appendChild(b);
+  }});
+}}
+
+function boardToRest() {{
+  if (!writer) return;
+  txt("r");                       // clears the E-stop latch and typed vetoes
+  txt("d0");                      // nothing detected, so both lamps go dark
+  txt("g1");
+  sent = {{d: 0, g: 1, p: false, n: false, e: false}};
+}}
+
+function demoStop(msg) {{
+  boardToRest();
+  clearInterval(pulseTimer);
+  pulseTimer = null;
+  clearTimeout(demoTimer);
+  demoTimer = null;
+  demoAt = -1;
+  el("runBtn").textContent = "Run the demo";
+  el("runBtn").classList.remove("stop");
+  el("runStep").textContent = "nine beats, about a minute";
+  el("runSay").textContent = msg || "Stopped. The controls below are live.";
+  demoDots();
+}}
+
+function demoBeat(i) {{
+  if (i >= DEMO.length) {{
+    boot(false);
+    dist.value = 200; grp.value = 1; person = false; nonTarget = false;
+    el("bPerson").classList.remove("held");
+    demoStop("That is the whole argument: it detects, and then it declines.");
+    return;
+  }}
+  demoAt = i;
+  const [ms, head, say, mode] = DEMO[i];
+  clearInterval(pulseTimer);
+  pulseTimer = null;
+
+  /* Start every beat on a fresh incident.
+   *
+   * Without this the escalation clock runs across the whole sequence, so it
+   * fires partway through and every later beat shows amber - the carriageway
+   * and out-of-range refusals get swallowed and never show their own reason.
+   * Each beat is a separate encounter, so it is given one. Beat 8 is the
+   * exception in duration, not in kind: it simply lasts long enough for the
+   * escalation to arrive on its own. */
+  person = false; nonTarget = false;
+  el("bPerson").classList.remove("held");
+  el("bNon").classList.remove("held");
+  S.estop = false;
+  S.state = "IDLE";
+  S.attempts = 0;
+  S.incidentStart = 0;
+  S.lastEmissionEnd = -1e9;
+  S.doNotEmit = false;
+  el("bStop").classList.remove("latched");
+
+  if (i === 0) {{ boot(true); dist.value = 200; grp.value = 1; }}
+  if (i === 1) {{ dist.value = 80;  grp.value = 1; }}
+  if (i === 2) {{ dist.value = 80;  person = true; el("bPerson").classList.add("held"); }}
+  if (i === 3) {{ dist.value = 80;  grp.value = 1; }}
+  if (i === 4) {{ dist.value = 80;  grp.value = 5; }}
+  if (i === 5) {{ dist.value = 20;  grp.value = 1; }}
+  if (i === 6) {{ dist.value = 160; grp.value = 1; }}
+  if (i === 7) {{ dist.value = 80;  grp.value = 1; }}
+  if (i === 8) {{ S.estop = true; }}
+
+  if (mode === "pulse") {{
+    /* Re-acquire the target every few seconds so the governor permits again.
+     * Green is only ever on for the length of one activation, so the way to
+     * show it is more activations, not a longer one. */
+    let far = false;
+    pulseTimer = setInterval(() => {{
+      far = !far;
+      dist.value = far ? 200 : 80;
+    }}, 2600);
+  }}
+
+  el("runStep").textContent = (i + 1) + " of " + DEMO.length + "  -  " + head;
+  el("runSay").textContent = say;
+  demoDots();
+  demoTimer = setTimeout(() => demoBeat(i + 1), ms);
+}}
+
+el("runBtn").addEventListener("click", () => {{
+  if (demoTimer) {{ demoStop(); return; }}
+  el("runBtn").textContent = "Stop";
+  el("runBtn").classList.add("stop");
+  boot(false);
+  demoBeat(0);
+}});
+demoDots();
+
+el("zLine").textContent = "carriageway under " + Math.round(K.LINE_M * K.DESK_SCALE) + " cm";
+el("zBand").textContent = "permit to " + Math.round(K.RANGE_MAX_M * K.DESK_SCALE) + " cm";
+boot(false);
+setInterval(tick, 1000 / 60);
+</script>
+"""
+
+
+def main() -> None:
+    c = consts()
+    p = pins()
+    sp = c["DEMO_SPEED"]
+
+    rows = [
+        ("Carrier", f"{c['CARRIER_HZ'] / 1000:.1f} kHz"),
+        ("Envelope ramp", f"{c['RAMP_MS']:.0f} ms raised cosine"),
+        ("Max single activation",
+         f"{c['MAX_ACTIVATION_MS'] / 1000:.0f} s  &rarr; demo {c['MAX_ACTIVATION_MS'] / sp / 1000:.1f} s"),
+        ("Enforced quiet period",
+         f"{c['MIN_SILENCE_MS'] / 1000:.0f} s  &rarr; demo {c['MIN_SILENCE_MS'] / sp / 1000:.1f} s"),
+        ("Daily exposure budget",
+         f"{c['DAILY_BUDGET_MS'] / 1000:.0f} s  &rarr; demo {c['DAILY_BUDGET_MS'] / sp / 1000:.0f} s"),
+        ("Escalate after",
+         f"{c['ESCALATE_AFTER_MS'] / 1000:.0f} s  &rarr; demo {c['ESCALATE_AFTER_MS'] / sp / 1000:.1f} s"),
+        ("Max group size", f"{c['MAX_GROUP']:.0f} animals"),
+        ("Max attempts", f"{c['MAX_ATTEMPTS']:.0f}"),
+        ("Bench scale", f"{c['DESK_SCALE']:.1f} cm per field metre"),
+        ("Carriageway line", f"{c['LINE_M']:.0f} m  ({c['LINE_M'] * c['DESK_SCALE']:.0f} cm on the bench)"),
+        ("Acoustic envelope", f"{c['RANGE_MAX_M']:.1f} m  ({c['RANGE_MAX_M'] * c['DESK_SCALE']:.0f} cm)"),
+    ]
+    limits = "".join(f'<tr><td class="k">{k}</td><td class="v">{v}</td></tr>'
+                     for k, v in rows)
+
+    page = PAGE.format(
+        consts=json.dumps(c, indent=None), limits=limits,
+        permit=p["LED_PERMIT"], refuse=p["LED_REFUSE"], escalate=p["LED_ESCALATE"],
+        armed=p["LED_ARMED"], emit=p["PIN_EMIT"],
+        carrier=f"{c['CARRIER_HZ'] / 1000:.0f}", ramp=f"{c['RAMP_MS']:.0f}",
+        maxgroup=f"{c['MAX_GROUP']:.0f}", maxatt=f"{c['MAX_ATTEMPTS']:.0f}",
+        budget=f"{c['DAILY_BUDGET_MS'] / sp / 1000:.0f}", speed=f"{sp:.0f}")
+    page = "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in page)
+
+    out = ROOT / "hardware" / "bench.html"
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote hardware/bench.html ({out.stat().st_size / 1024:.0f} KB), "
+          f"{len(c)} limits mirrored from the firmware")
+
+
+if __name__ == "__main__":
+    main()

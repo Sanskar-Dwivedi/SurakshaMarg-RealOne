@@ -47,6 +47,11 @@ inline unsigned long millis() { return 0; }
 inline void delay(unsigned long) {}
 inline void delayMicroseconds(unsigned long) {}
 inline unsigned long pulseIn(int, int, unsigned long) { return 0; }
+template <typename T> inline T constrain(T x, T lo, T hi) {
+  return x < lo ? lo : (x > hi ? hi : x);
+}
+template <typename T> inline T max(T a, T b) { return a > b ? a : b; }
+template <typename T> inline T min(T a, T b) { return a < b ? a : b; }
 inline long map(long x, long a, long b, long c, long d) {
   return (x - a) * (d - c) / (b - a) + c;
 }
@@ -62,6 +67,8 @@ struct SerialT {
   template <class T> void print(T) {}
   template <class T> void print(T, int) {}
   template <class... A> void printf(const char *, A...) {}
+  int available() { return 0; }
+  int read() { return -1; }
 };
 inline SerialT Serial;
 

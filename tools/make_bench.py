@@ -30,7 +30,7 @@ ESP = ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino"
 
 WANTED = ("MAX_GROUP", "MAX_ACTIVATION_MS", "MIN_SILENCE_MS", "DAILY_BUDGET_MS",
           "ESCALATE_AFTER_MS", "MAX_ATTEMPTS", "CARRIER_HZ", "DEMO_SPEED",
-          "RAMP_MS", "DESK_SCALE", "RANGE_MAX_M", "LINE_M")
+          "RAMP_MS", "DESK_SCALE", "RANGE_MAX_M", "LINE_M", "SEEN_MAX_CM")
 
 
 def esc(s) -> str:
@@ -252,14 +252,14 @@ enforces the firmware's rules rather than an approximation of them.</p>
 <div class="ctl">
   <label>Distance to animal <b><span id="cmTxt">200</span> cm
     &rarr; <span id="mTxt">--</span></b></label>
-  <input type="range" id="dist" min="0" max="200" step="1" value="200">
+  <input type="range" id="dist" min="0" max="{seenmax}" step="1" value="{seenmax}">
   <div class="zones"><span>0</span><span id="zLine">carriageway</span>
-    <span id="zBand">permit band</span><span>200 cm</span></div>
+    <span id="zBand">permit band</span><span>{seenmax} cm</span></div>
   <div class="presets" id="dPresets">
-    <span class="chip" data-d="0">gone</span>
-    <span class="chip" data-d="20">20 cm &mdash; at the road</span>
-    <span class="chip" data-d="80">80 cm &mdash; permit</span>
-    <span class="chip" data-d="160">160 cm &mdash; too far</span>
+    <span class="chip" data-d="{seenmax}">gone</span>
+    <span class="chip" data-d="8">8 cm &mdash; at the road</span>
+    <span class="chip" data-d="25">25 cm &mdash; permit</span>
+    <span class="chip" data-d="55">55 cm &mdash; too far</span>
   </div>
 
   <label>Group size <b><span id="grpTxt">1</span> animals</b></label>
@@ -320,6 +320,7 @@ figures are in the table below.</p>
 </div>
 <script>
 const K = {consts};
+const SEEN_MAX = K.SEEN_MAX_CM;
 
 const el = (id) => document.getElementById(id);
 const lamp = {{permit: el("lampPermit"), refuse: el("lampRefuse"),
@@ -383,7 +384,7 @@ document.querySelectorAll("[data-g]").forEach((c) => {{
 el("bStop").addEventListener("click", () => {{ S.estop = true; }});
 el("bReset").addEventListener("click", () => {{
   boot(false);
-  dist.value = 200; grp.value = 1;
+  dist.value = SEEN_MAX; grp.value = 1;
   person = false; nonTarget = false;
   el("bPerson").classList.remove("held");
   el("bNon").classList.remove("held");
@@ -456,7 +457,7 @@ function tick() {{
 
   lamp.armed.classList.add("beat");    // CSS runs it; see @keyframes heartbeat
 
-  const seen = cm > 0 && cm < 200;
+  const seen = cm > 0 && cm < K.SEEN_MAX_CM;
   const metres = seen ? cm / K.DESK_SCALE : 999;
 
   if (S.state === "EMITTING" && (t - S.emitStartedAt) >= scaled(K.MAX_ACTIVATION_MS)) {{
@@ -529,7 +530,7 @@ function tick() {{
 
 function paint(cm, group) {{
   const t = now();
-  const metres = (cm > 0 && cm < 200) ? cm / K.DESK_SCALE : null;
+  const metres = (cm > 0 && cm < K.SEEN_MAX_CM) ? cm / K.DESK_SCALE : null;
   el("mTxt").textContent = metres === null ? "out of view" : metres.toFixed(1) + " m";
 
   // raised-cosine envelope, the same shape the LEDC duty follows
@@ -665,7 +666,7 @@ el("linkBtn").addEventListener("click", linkBoard);
 const DEMO = [
   [3000, "The road is clear", "Nothing detected. The system is armed and quiet."],
   [12000, "An animal approaches",
-   "Detected at 28 metres. It permits - then cuts itself off after six "
+   "Detected at 25 metres. It permits - then cuts itself off after six "
    + "seconds, waits out the quiet period, and tries again. Every green "
    + "flash is a fresh decision.", "pulse"],
   [5200, "A person is in the cone",
@@ -722,7 +723,7 @@ function demoStop(msg) {{
 function demoBeat(i) {{
   if (i >= DEMO.length) {{
     boot(false);
-    dist.value = 200; grp.value = 1; person = false; nonTarget = false;
+    dist.value = SEEN_MAX; grp.value = 1; person = false; nonTarget = false;
     el("bPerson").classList.remove("held");
     demoStop("That is the whole argument: it detects, and then it declines.");
     return;
@@ -751,14 +752,14 @@ function demoBeat(i) {{
   S.doNotEmit = false;
   el("bStop").classList.remove("latched");
 
-  if (i === 0) {{ boot(true); dist.value = 200; grp.value = 1; }}
-  if (i === 1) {{ dist.value = 80;  grp.value = 1; }}
-  if (i === 2) {{ dist.value = 80;  person = true; el("bPerson").classList.add("held"); }}
-  if (i === 3) {{ dist.value = 80;  grp.value = 1; }}
-  if (i === 4) {{ dist.value = 80;  grp.value = 5; }}
-  if (i === 5) {{ dist.value = 20;  grp.value = 1; }}
-  if (i === 6) {{ dist.value = 160; grp.value = 1; }}
-  if (i === 7) {{ dist.value = 80;  grp.value = 1; }}
+  if (i === 0) {{ boot(true); dist.value = SEEN_MAX; grp.value = 1; }}
+  if (i === 1) {{ dist.value = 25;  grp.value = 1; }}
+  if (i === 2) {{ dist.value = 25;  person = true; el("bPerson").classList.add("held"); }}
+  if (i === 3) {{ dist.value = 25;  grp.value = 1; }}
+  if (i === 4) {{ dist.value = 25;  grp.value = 5; }}
+  if (i === 5) {{ dist.value = 8;  grp.value = 1; }}
+  if (i === 6) {{ dist.value = 55; grp.value = 1; }}
+  if (i === 7) {{ dist.value = 25;  grp.value = 1; }}
   if (i === 8) {{ S.estop = true; }}
 
   if (mode === "pulse") {{
@@ -768,7 +769,7 @@ function demoBeat(i) {{
     let far = false;
     pulseTimer = setInterval(() => {{
       far = !far;
-      dist.value = far ? 200 : 80;
+      dist.value = far ? SEEN_MAX : 25;
     }}, 2600);
   }}
 
@@ -822,6 +823,7 @@ def main() -> None:
 
     page = PAGE.format(
         consts=json.dumps(c, indent=None), limits=limits,
+        seenmax=f"{c['SEEN_MAX_CM']:.0f}",
         permit=p["LED_PERMIT"], refuse=p["LED_REFUSE"], escalate=p["LED_ESCALATE"],
         armed=p["LED_ARMED"], emit=p["PIN_EMIT"],
         carrier=f"{c['CARRIER_HZ'] / 1000:.0f}", ramp=f"{c['RAMP_MS']:.0f}",

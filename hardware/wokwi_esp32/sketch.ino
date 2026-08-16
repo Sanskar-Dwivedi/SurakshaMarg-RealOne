@@ -157,7 +157,19 @@ const uint8_t  MAX_ATTEMPTS      = 3;
  * nobody is watching those. */
 const uint16_t DEMO_SPEED        = 2;
 
-const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
+/* One centimetre on the bench is one metre of field range. Chosen for the
+ * demo rather than derived: at the old 2.8 the permit band sat between 34 and
+ * 120 cm, which is a metre of desk and further than anyone naturally holds a
+ * hand, so the rig looked like it only ever refused. At 1.0 the whole thing
+ * fits inside arm's reach and the arithmetic is something you can say out loud
+ * while it happens. */
+const float DESK_SCALE  = 1.0;    // cm on the bench per metre of field range
+
+/* Beyond this the bench sees nothing at all, rather than seeing something and
+ * refusing it for being out of range. Without it a wall across the room is a
+ * permanent detection the governor keeps declining, and the log fills with
+ * refusals nobody caused. */
+const float SEEN_MAX_CM = 70.0;
 const float RANGE_MAX_M = 42.8;
 const float LINE_M      = 12.0;
 
@@ -615,7 +627,7 @@ void loop() {
 #else
   float cm = simDistanceCm;
 #endif
-  bool  seen = (cm > 0 && cm < 200);
+  bool  seen = (cm > 0 && cm < SEEN_MAX_CM);
   float metres = seen ? (cm / DESK_SCALE) : 999.0f;
 
   if (state == EMITTING && (now - emitStartedAt) >= scaled(MAX_ACTIVATION_MS)) {

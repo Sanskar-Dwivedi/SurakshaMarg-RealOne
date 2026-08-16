@@ -233,8 +233,8 @@ enforces the firmware's rules rather than an approximation of them.</p>
     <b>PERMIT</b><span>GPIO{permit}</span></div>
   <div class="lamp"><div class="bulb" id="lampRefuse" style="--glow:#E74C3C"></div>
     <b>REFUSE</b><span>GPIO{refuse}</span></div>
-  <div class="lamp"><div class="bulb" id="lampEsc" style="--glow:#F1C40F"></div>
-    <b>ESCALATE</b><span>GPIO{escalate}</span></div>
+  <div class="lamp"><div class="bulb" id="lampFar" style="--glow:#F1C40F"></div>
+    <b>OUT OF RANGE</b><span>GPIO26</span></div>
   <div class="lamp"><div class="bulb" id="lampArmed" style="--glow:#3498DB"></div>
     <b>ARMED</b><span>GPIO{armed}</span></div>
 </div>
@@ -324,7 +324,7 @@ const SEEN_MAX = K.SEEN_MAX_CM;
 
 const el = (id) => document.getElementById(id);
 const lamp = {{permit: el("lampPermit"), refuse: el("lampRefuse"),
-               esc: el("lampEsc"), armed: el("lampArmed")}};
+               far: el("lampFar"), armed: el("lampArmed")}};
 const horn = el("horn"), duty = el("duty"), dutyTxt = el("dutyTxt");
 const log = el("log");
 
@@ -403,10 +403,15 @@ addEventListener("keyup", (e) => {{
 }});
 
 // ---- the governor, mirroring loop() in gaukavach_esp32.ino
+/* Mirrors leds() in the firmware's two-lamp build, so the screen and the board
+ * cannot show different things. Red carries refusal and blinks for escalation;
+ * yellow is reserved for the one refusal about geometry. */
+let farRefusal = false;
 function leds(p, r, e) {{
   lamp.permit.classList.toggle("on", p);
-  lamp.refuse.classList.toggle("on", r);
-  lamp.esc.classList.toggle("on", e);
+  const blink = Math.floor(performance.now() / 250) % 2 === 0;
+  lamp.refuse.classList.toggle("on", e ? blink : (r && !farRefusal));
+  lamp.far.classList.toggle("on", farRefusal && !e);
 }}
 
 function stopEmitting(why) {{
@@ -428,6 +433,7 @@ const now = () => performance.now() - t0;
 
 function tick() {{
   const t = now();
+  farRefusal = false;        // cleared every pass, before any early return
   const cm = +dist.value;
   const group = +grp.value;
 
@@ -484,7 +490,8 @@ function tick() {{
   else if (person)                  deny = "a person is inside the exposure cone";
   else if (nonTarget)               deny = "a non-target species is inside the cone";
   else if (group > K.MAX_GROUP)     deny = "group large enough that a startle could cascade";
-  else if (metres > K.RANGE_MAX_M)  deny = "beyond the acoustic envelope";
+  else if (metres > K.RANGE_MAX_M)  {{ deny = "beyond the acoustic envelope";
+                                       farRefusal = true; }}
   else if (metres <= K.LINE_M)      deny = "already at the carriageway - fleeing would cross it";
   else if (S.state === "COOLDOWN" &&
            (t - S.lastEmissionEnd) < scaled(K.MIN_SILENCE_MS))
@@ -678,7 +685,7 @@ const DEMO = [
   [5200, "Already at the carriageway",
    "Too close. Fleeing from here would mean crossing the road."],
   [5000, "Beyond the envelope",
-   "Out of range. It will not pretend to act at a distance it cannot reach."],
+   "Out of range - the yellow lamp. It will not pretend to act at a distance it cannot reach."],
   [9000, "It gives up",
    "Three attempts, then it stops and asks for a human. Acoustic cues are "
    + "not stock-proof and this does not pretend otherwise."],

@@ -623,9 +623,15 @@ void leds(bool p, bool r, bool e) {
 void leds(bool p, bool r, bool e) {
   digitalWrite(LAMP_GO, p);
   bool blink = ((millis() / 250) % 2) == 0;
-  digitalWrite(LAMP_STOP, e ? blink : r);
 #if FAR_LAMP_MODE
-  digitalWrite(LAMP_FAR, farRefusal);
+  /* A range refusal lights yellow and only yellow. Sharing red would leave the
+   * three zones as two colours, and the point of the third lamp is that the
+   * distance reads without narration: red too close, green in range, yellow
+   * too far. Escalation still owns blinking red, whatever the reason was. */
+  digitalWrite(LAMP_STOP, e ? blink : (r && !farRefusal));
+  digitalWrite(LAMP_FAR, farRefusal && !e);
+#else
+  digitalWrite(LAMP_STOP, e ? blink : r);
 #endif
 }
 #else

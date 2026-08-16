@@ -96,18 +96,37 @@ def cmd_citations(args) -> int:
     print(BANNER)
     print(RULE)
     unver = ev.unverified_sources()
-    print(f"{len(ev.SOURCES)} sources, {len(unver)} not yet personally retrieved.")
+    checked = [k for k in unver if ev.SOURCES[k].metadata_checked]
+    neither = [k for k in unver if not ev.SOURCES[k].metadata_checked]
+
+    print(f"{len(ev.SOURCES)} sources.")
+    print(f"  {len(checked):>2} metadata checked against the publisher's record, "
+          f"not yet read")
+    print(f"  {len(neither):>2} neither checked nor read")
     print()
-    print("A citation carried from memory is a liability in exactly the kind of")
-    print("review this project invites. Retrieve each of these, confirm the")
-    print("volume, pages and reported values, then set first_party_verified=True")
-    print("in evidence.py. Do this BEFORE presenting.")
+    print("These are two different claims and the registry keeps them apart.")
+    print("A metadata check confirms the reference exists and that its year,")
+    print("volume and pages are right - the error that gets caught in review.")
+    print("It says nothing about whether the source supports the claim drawn")
+    print("from it. Only reading it does that, and only a person can.")
     print()
-    for k in unver:
+    print("Re-run the machine half any time:  python tools/check_citations.py")
+    print()
+
+    if neither:
+        print("NOT CHECKED BY ANY MEANS - start here:")
+        for k in neither:
+            src = ev.SOURCES[k]
+            print(f"  [ ] {k:<5} {src.citation}")
+            if src.url:
+                print(f"            {src.url}")
+        print()
+
+    print("METADATA CONFIRMED, STILL NEEDS READING:")
+    for k in checked:
         src = ev.SOURCES[k]
-        print(f"  [ ] {k:<5} {src.citation}")
-        if src.url:
-            print(f"            {src.url}")
+        print(f"  [ ] {k:<5} {src.citation[:64]}")
+        print(f"            checked {src.metadata_checked}")
     return 0
 
 

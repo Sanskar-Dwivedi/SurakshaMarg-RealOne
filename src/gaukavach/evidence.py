@@ -43,7 +43,22 @@ class Source:
     # opposed to citing it from a secondary reference or from memory. Anything
     # left False must be checked before this work is presented or published.
     # Recording the distinction is cheaper than being caught by it.
+    #
+    # Only a person may set this. It is a claim about scholarship: that someone
+    # read the thing and confirmed it says what we say it says.
     first_party_verified: bool = False
+
+    # A weaker, machine-made claim, kept deliberately separate: on this date the
+    # citation's year, volume and pages were compared against the publisher's
+    # own record via CrossRef or PubMed, and agreed. Re-runnable with
+    # tools/check_citations.py.
+    #
+    # This catches the error that actually gets caught in review - a volume that
+    # has drifted, a transposed page range - and catches nothing else. It says
+    # nothing about whether the source supports the claim drawn from it. Folding
+    # the two together would let a lookup pass itself off as reading, which is
+    # the exact substitution this registry exists to prevent.
+    metadata_checked: str = ""
 
 
 SOURCES: dict[str, Source] = {
@@ -55,6 +70,7 @@ SOURCES: dict[str, Source] = {
         "Primary behavioural audiogram. Cattle 23 Hz - 35 kHz, best sensitivity "
         "near 8 kHz. Range endpoints are defined at a 60 dB SPL criterion - the "
         "single most load-bearing fact in the whole system.",
+        metadata_checked="2026-08-16",
     ),
     "R2": Source(
         "R2",
@@ -62,6 +78,7 @@ SOURCES: dict[str, Source] = {
         "Animals 13(14), 2307.",
         "https://doi.org/10.3390/ani13142307",
         "Livestock acoustics review; cattle hearing and adverse noise effects.",
+        metadata_checked="2026-08-16",
     ),
     "R3": Source(
         "R3",
@@ -70,6 +87,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1016/j.jveb.2022.10.004",
         "Individual and breed variation in auditory sensitivity - the reason we "
         "carry a per-animal response prior rather than one global threshold.",
+        metadata_checked="2026-08-16",
     ),
     "R4": Source(
         "R4",
@@ -79,6 +97,7 @@ SOURCES: dict[str, Source] = {
         "The only direct cattle-ultrasound prototype. Reports 30 kHz avoidance "
         "at 142 dB SPL @ 1 m. We cite it as motivation and explicitly REFUSE to "
         "reproduce its exposure level. See welfare.HARD_REFUSAL_DB.",
+        metadata_checked="2026-08-16",
     ),
     "R5": Source(
         "R5",
@@ -87,6 +106,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1016/j.applanim.2013.04.019",
         "Audio cues shift cattle location but do NOT give stock-proof "
         "containment. Basis for our 'deterrent layer, never a barrier' rule.",
+        metadata_checked="2026-08-16",
     ),
     "R6": Source(
         "R6",
@@ -94,6 +114,7 @@ SOURCES: dict[str, Source] = {
         "effective and ethical virtual fences. Appl. Anim. Behav. Sci. 119, 15-22.",
         "https://doi.org/10.1016/j.applanim.2009.03.010",
         "Cattle learn audio cue -> consequence. Unconditioned tones are weaker.",
+        metadata_checked="2026-08-16",
     ),
     "R9": Source(
         "R9",
@@ -102,6 +123,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.3389/fvets.2020.543158",
         "Social facilitation: herd members copy responders. Basis for our herd "
         "model and the leader-breakthrough failure mode.",
+        metadata_checked="2026-08-16",
     ),
     "R11": Source(
         "R11",
@@ -109,6 +131,7 @@ SOURCES: dict[str, Source] = {
         "to virtual fences? A review. J. Anim. Sci. 102, skae108.",
         "https://doi.org/10.1093/jas/skae108",
         "Review of cattle learning, response and welfare evidence.",
+        metadata_checked="2026-08-16",
     ),
     "R13": Source(
         "R13",
@@ -117,6 +140,7 @@ SOURCES: dict[str, Source] = {
         "Human audibility 15-20 kHz and not a fixed boundary; ultrasonic sources "
         "generate audible subharmonics; 6 dB per distance doubling; "
         "international ceiling recommendations ~105-115 dB in the 20-40 kHz band.",
+        metadata_checked="2026-08-16",
     ),
     "R14": Source(
         "R14",
@@ -124,6 +148,7 @@ SOURCES: dict[str, Source] = {
         "attenuation at ultrasonic frequencies. JASA 71(3), 585-590.",
         "https://doi.org/10.1121/1.387529",
         "Measured approximately 0.7 dB/m at 30 kHz, 25 C, 50% RH.",
+        metadata_checked="2026-08-16",
     ),
     "R15": Source(
         "R15",
@@ -138,8 +163,9 @@ SOURCES: dict[str, Source] = {
         "R16",
         "Dimov, D. et al. (2023). Importance of Noise Hygiene in Dairy Cattle "
         "Farming - A Review. Acoustics 5, 1036-1045.",
-        "https://www.mdpi.com/2624-599X/5/4/59",
+        "https://doi.org/10.3390/acoustics5040059",
         "Avoid excessive or sudden noise; adverse responses at elevated levels.",
+        metadata_checked="2026-08-16",
     ),
     # -- comparative audiograms -------------------------------------------
     # All measured at the SAME 60 dB SPL criterion as R1, which is what makes
@@ -153,6 +179,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1037/0735-7044.97.2.310",
         "Dog hearing to approximately 45 kHz. Companion paper to R1 in the "
         "same issue. Basis for the absolute dog veto.",
+        metadata_checked="2026-08-16",
     ),
     "R18": Source(
         "R18",
@@ -161,6 +188,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1016/0378-5955(85)90100-5",
         "Cat hearing to approximately 85 kHz - the most sensitive receiver "
         "likely to be present at any deployment site.",
+        metadata_checked="2026-08-16",
     ),
     "R19": Source(
         "R19",
@@ -169,6 +197,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1016/0378-5955(90)90063-U",
         "Goat to approximately 37 kHz, pig to approximately 40.5 kHz. Both "
         "above cattle. Directly supports the user-raised goat-herd hazard.",
+        metadata_checked="2026-08-16",
     ),
     "R20": Source(
         "R20",
@@ -187,6 +216,7 @@ SOURCES: dict[str, Source] = {
         "https://doi.org/10.1037/0735-7036.96.6.926",
         "Elephant hearing tops out near 10.5 kHz - an ultrasonic deterrent is "
         "simply inapplicable, which is worth stating explicitly.",
+        metadata_checked="2026-08-16",
     ),
     "R22": Source(
         "R22",
@@ -196,6 +226,7 @@ SOURCES: dict[str, Source] = {
         "https://pubmed.ncbi.nlm.nih.gov/17203911/",
         "Consolidated comparative table at a common 60 dB SPL criterion. The "
         "spine of species.py.",
+        metadata_checked="2026-08-16",
     ),
     "R23": Source(
         "R23",
@@ -205,6 +236,7 @@ SOURCES: dict[str, Source] = {
         "Thresholds above 16 kHz in young listeners. Supports the separate "
         "child-audibility curve: a carrier inaudible to adults is not "
         "automatically inaudible to children.",
+        metadata_checked="2026-08-16",
     ),
     "R24": Source(
         "R24",
@@ -214,6 +246,7 @@ SOURCES: dict[str, Source] = {
         "Flight zone, point of balance and the consequences of applying "
         "pressure from the wrong angle. The conceptual basis for refusing to "
         "emit when the animal's flight path leads into the carriageway.",
+        metadata_checked="2026-08-16",
     ),
     "OURS": Source(
         "OURS",

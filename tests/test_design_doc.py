@@ -126,3 +126,45 @@ def test_every_shipped_page_opens_correctly_without_a_server():
     assert not dirty, (
         f"these pages would mojibake when opened directly: {dirty}. "
         f"Run: python tools/ascii_pages.py")
+
+
+def test_a_machine_check_can_never_pass_for_having_read_the_source():
+    """The two claims in the evidence registry must stay separate.
+
+    metadata_checked says a lookup agreed about year, volume and pages.
+    first_party_verified says a person read the thing. Collapsing them - by
+    setting the human flag from the tool, or by deriving one from the other -
+    would let an automated lookup pass itself off as scholarship, which is the
+    substitution this registry exists to prevent.
+    """
+    import sys
+    sys.path.insert(0, str(ROOT / "src"))
+    from gaukavach import evidence as ev
+
+    checker = (ROOT / "tools" / "check_citations.py").read_text(encoding="utf-8")
+    assert "first_party_verified=True" not in checker, (
+        "the citation checker must never set the human-verification flag")
+    assert "first_party_verified =" not in checker
+
+    # and the registry must not infer one from the other
+    src = (ROOT / "src" / "gaukavach" / "evidence.py").read_text(encoding="utf-8")
+    assert "first_party_verified=metadata_checked" not in src.replace(" ", "")
+
+    machine_only = [k for k, s in ev.SOURCES.items()
+                    if s.metadata_checked and not s.first_party_verified]
+    assert machine_only, (
+        "expected sources whose metadata is checked but which nobody has read; "
+        "if that set is empty the distinction has quietly been erased")
+
+
+def test_every_metadata_check_carries_a_date():
+    """An undated check cannot be audited or re-run against a moved citation."""
+    import re
+    import sys
+    sys.path.insert(0, str(ROOT / "src"))
+    from gaukavach import evidence as ev
+
+    for k, s in ev.SOURCES.items():
+        if s.metadata_checked:
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", s.metadata_checked), (
+                f"{k} records {s.metadata_checked!r}, which is not a date")

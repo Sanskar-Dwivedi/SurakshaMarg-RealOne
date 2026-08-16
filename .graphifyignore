@@ -1,0 +1,29 @@
+# Generated build artifacts.
+#
+# Everything here is produced by something in tools/ or by `gaukavach sim`, and
+# is regenerable from source. Indexing it would swamp the graph: simulator.html
+# alone is 6.5 MB, almost all of it base64-encoded JPEG frames, and the sim/
+# footage JSON blobs are the same data again in another form. The graph should
+# describe the code that makes these, not the megabytes they contain.
+
+dashboard/sim.json
+dashboard/footage.json
+dashboard/outcome.json
+dashboard/data.json
+dashboard/trim.json
+dashboard/detstats.json
+dashboard/simulator.html
+
+hardware/build_steps.html
+hardware/breadboard.html
+hardware/wiring.html
+hardware/wiring_uno.svg
+hardware/wiring_esp32.svg
+
+# Duplicates of the sketches, kept only because Wokwi insists on the filename.
+hardware/wokwi_uno/sketch.ino
+hardware/wokwi_esp32/sketch.ino
+
+# Model weights and source footage: binary, huge, and not ours.
+*.pt
+footage/

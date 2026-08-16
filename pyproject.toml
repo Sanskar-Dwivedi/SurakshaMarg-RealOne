@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gaukavach"
+version = "0.5.0"
+description = "Evidence-graded, welfare-bounded acoustic deterrence for livestock-on-carriageway incidents"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+vision = ["ultralytics>=8.0", "opencv-python>=4.8"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+gaukavach = "gaukavach.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pyright]
+extraPaths = ["src"]
+reportMissingImports = "none"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

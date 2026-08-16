@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "author": "GauKavach",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -40,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "sr04",
+      "top": -250,
+      "left": 180,
+      "attrs": {
+        "distance": "80"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rDiv1",
+      "top": -150,
+      "left": 320,
+      "attrs": {
+        "value": "1000"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rDiv2",
+      "top": -110,
+      "left": 320,
+      "attrs": {
+        "value": "2000"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledGreen",
+      "top": -70,
+      "left": 175,
+      "attrs": {
+        "color": "green",
+        "label": "PERMIT"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledRed",
+      "top": -70,
+      "left": 245,
+      "attrs": {
+        "color": "red",
+        "label": "REFUSE"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledAmber",
+      "top": -70,
+      "left": 315,
+      "attrs": {
+        "color": "orange",
+        "label": "ESCALATE"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rG",
+      "top": 10,
+      "left": 160,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rR",
+      "top": 10,
+      "left": 230,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rA",
+      "top": 10,
+      "left": 300,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": -80,
+      "left": 410,
+      "attrs": {
+        "volume": "0.1"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rEmit",
+      "top": 10,
+      "left": 400,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnPerson",
+      "top": 100,
+      "left": 170,
+      "attrs": {
+        "color": "blue",
+        "label": "PERSON"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnNonTarget",
+      "top": 180,
+      "left": 170,
+      "attrs": {
+        "color": "yellow",
+        "label": "DOG / GOAT"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnEstop",
+      "top": 260,
+      "left": 170,
+      "attrs": {
+        "color": "red",
+        "label": "E-STOP"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rEstop",
+      "top": 268,
+      "left": 270,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot",
+      "top": 130,
+      "left": 380,
+      "attrs": {
+        "label": "GROUP SIZE"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:5V",
+      "sr04:VCC",
+      "red",
+      [
+        "v-20"
+      ]
+    ],
+    [
+      "esp:GND.1",
+      "sr04:GND",
+      "black",
+      [
+        "v-30"
+      ]
+    ],
+    [
+      "esp:13",
+      "sr04:TRIG",
+      "green",
+      [
+        "v-40"
+      ]
+    ],
+    [
+      "sr04:ECHO",
+      "rDiv1:1",
+      "blue",
+      [
+        "v20"
+      ]
+    ],
+    [
+      "rDiv1:2",
+      "rDiv2:1",
+      "blue",
+      [
+        "v10"
+      ]
+    ],
+    [
+      "rDiv1:2",
+      "esp:VN",
+      "blue",
+      [
+        "v30"
+      ]
+    ],
+    [
+      "rDiv2:2",
+      "esp:GND.2",
+      "black",
+      [
+        "v40"
+      ]
+    ],
+    [
+      "esp:26",
+      "rG:1",
+      "green",
+      [
+        "v10"
+      ]
+    ],
+    [
+      "rG:2",
+      "ledGreen:A",
+      "green",
+      [
+        "v-10"
+      ]
+    ],
+    [
+      "ledGreen:C",
+      "esp:GND.2",
+      "black",
+      [
+        "v-20"
+      ]
+    ],
+    [
+      "esp:27",
+      "rR:1",
+      "red",
+      [
+        "v15"
+      ]
+    ],
+    [
+      "rR:2",
+      "ledRed:A",
+      "red",
+      [
+        "v-10"
+      ]
+    ],
+    [
+      "ledRed:C",
+      "esp:GND.2",
+      "black",
+      [
+        "v-25"
+      ]
+    ],
+    [
+      "esp:14",
+      "rA:1",
+      "orange",
+      [
+        "v20"
+      ]
+    ],
+    [
+      "rA:2",
+      "ledAmber:A",
+      "orange",
+      [
+        "v-10"
+      ]
+    ],
+    [
+      "ledAmber:C",
+      "esp:GND.2",
+      "black",
+      [
+        "v-30"
+      ]
+    ],
+    [
+      "esp:25",
+      "rEmit:1",
+      "violet",
+      [
+        "v25"
+      ]
+    ],
+    [
+      "rEmit:2",
+      "bz:1",
+      "violet",
+      [
+        "v-10"
+      ]
+    ],
+    [
+      "bz:2",
+      "esp:GND.2",
+      "black",
+      [
+        "v-35"
+      ]
+    ],
+    [
+      "esp:32",
+      "btnPerson:1.l",
+      "blue",
+      [
+        "v10"
+      ]
+    ],
+    [
+      "btnPerson:2.l",
+      "esp:GND.3",
+      "black",
+      [
+        "v20"
+      ]
+    ],
+    [
+      "esp:33",
+      "btnNonTarget:1.l",
+      "gold",
+      [
+        "v20"
+      ]
+    ],
+    [
+      "btnNonTarget:2.l",
+      "esp:GND.3",
+      "black",
+      [
+        "v30"
+      ]
+    ],
+    [
+      "esp:35",
+      "btnEstop:1.l",
+      "red",
+      [
+        "v30"
+      ]
+    ],
+    [
+      "btnEstop:2.l",
+      "esp:GND.3",
+      "black",
+      [
+        "v40"
+      ]
+    ],
+    [
+      "btnEstop:1.l",
+      "rEstop:1",
+      "gray",
+      [
+        "v-10"
+      ]
+    ],
+    [
+      "rEstop:2",
+      "esp:3V3",
+      "red",
+      [
+        "v-40"
+      ]
+    ],
+    [
+      "pot:VCC",
+      "esp:3V3",
+      "red",
+      [
+        "v50"
+      ]
+    ],
+    [
+      "pot:GND",
+      "esp:GND.3",
+      "black",
+      [
+        "v50"
+      ]
+    ],
+    [
+      "pot:SIG",
+      "esp:34",
+      "purple",
+      [
+        "v40"
+      ]
+    ]
+  ],
+  "dependencies": {}
+}

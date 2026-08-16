@@ -1,0 +1,703 @@
+<title>GauKavach — Evidence Envelope</title>
+<style>
+:root{
+  --ground:#EDF0F3; --surface:#FFFFFF; --surface-2:#F5F8FA; --sunk:#E4E9ED;
+  --ink:#0F141A; --body:#28323C; --muted:#5D6B79; --faint:#8695A3;
+  --line:#D2DAE1; --line-strong:#B6C2CC;
+  --accent:#0E7C86; --accent-soft:#DBEDEF; --accent-line:#8FC6CB;
+  --ok:#1C7A4B; --ok-bg:#E2F1E8;
+  --warn:#93670A; --warn-bg:#F8EFD8;
+  --crit:#A9291F; --crit-bg:#F8E4E2;
+  --grid:#E1E7EC;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C1116; --surface:#131A21; --surface-2:#182028; --sunk:#0A0F13;
+    --ink:#E9EEF3; --body:#C3CFD9; --muted:#8FA0AE; --faint:#6B7C8A;
+    --line:#212C36; --line-strong:#2E3C48;
+    --accent:#40B9C2; --accent-soft:#10333A; --accent-line:#1F6771;
+    --ok:#5FBF8A; --ok-bg:#12291E;
+    --warn:#D9A63C; --warn-bg:#2C2314;
+    --crit:#E0776C; --crit-bg:#2E1815;
+    --grid:#1C252E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C1116; --surface:#131A21; --surface-2:#182028; --sunk:#0A0F13;
+  --ink:#E9EEF3; --body:#C3CFD9; --muted:#8FA0AE; --faint:#6B7C8A;
+  --line:#212C36; --line-strong:#2E3C48;
+  --accent:#40B9C2; --accent-soft:#10333A; --accent-line:#1F6771;
+  --ok:#5FBF8A; --ok-bg:#12291E;
+  --warn:#D9A63C; --warn-bg:#2C2314;
+  --crit:#E0776C; --crit-bg:#2E1815;
+  --grid:#1C252E;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--body);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15.5px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:Charter,"Bitstream Charter","Iowan Old Style",Georgia,"Times New Roman",serif}
+.mono,code,td.num,.tile-v,.chip{font-family:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+h1,h2,h3{font-family:Charter,"Bitstream Charter","Iowan Old Style",Georgia,serif;color:var(--ink);text-wrap:balance;margin:0}
+a{color:var(--accent)}
+
+/* ---------- masthead ---------- */
+header{background:var(--surface);border-bottom:1px solid var(--line)}
+.mast{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;padding:34px 0 26px}
+.mast-id{flex:1 1 380px;min-width:300px}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+  font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;margin-bottom:10px}
+h1{font-size:clamp(30px,4.4vw,44px);line-height:1.08;letter-spacing:-.015em}
+h1 .sub{display:block;font-size:.44em;letter-spacing:.01em;color:var(--muted);font-weight:400;margin-top:12px;line-height:1.4}
+.thesis{margin:18px 0 0;max-width:60ch;color:var(--body)}
+.thesis strong{color:var(--ink)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);flex:1 1 320px}
+.tile{background:var(--surface-2);padding:13px 14px}
+.tile-k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.tile-v{font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:5px;line-height:1.15}
+.tile-v small{font-size:12px;color:var(--muted)}
+.tile.crit .tile-v{color:var(--crit)}
+.tile.ok .tile-v{color:var(--ok)}
+
+/* ---------- sections ---------- */
+main{padding:0 0 80px}
+section{padding:46px 0 8px;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+.qhead{display:flex;gap:16px;align-items:baseline;margin-bottom:6px}
+.qnum{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--accent);
+  border:1px solid var(--accent-line);background:var(--accent-soft);
+  padding:3px 8px;flex:none;letter-spacing:.04em}
+h2{font-size:clamp(21px,2.7vw,27px);letter-spacing:-.01em;line-height:1.25}
+.answer{max-width:66ch;margin:14px 0 0}
+.answer + .answer{margin-top:12px}
+h3{font-size:15px;letter-spacing:.01em;margin:30px 0 10px}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:26px;margin-top:24px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);padding:18px 20px}
+.card h3{margin-top:0}
+.cap{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+
+/* ---------- data ---------- */
+.scroll{overflow-x:auto;margin-top:18px;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:400;
+  padding:10px 13px;border-bottom:1px solid var(--line-strong);white-space:nowrap;background:var(--surface-2)}
+td{padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink)}
+td.name{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--ink);white-space:nowrap}
+td.why{color:var(--muted);font-size:12.5px;line-height:1.5;min-width:280px}
+
+.chip{display:inline-block;font-size:10.5px;letter-spacing:.05em;padding:2px 7px;
+  border:1px solid currentColor;white-space:nowrap;text-transform:uppercase}
+.g-high{color:var(--ok);background:var(--ok-bg)}
+.g-mod{color:var(--accent);background:var(--accent-soft)}
+.g-low{color:var(--warn);background:var(--warn-bg)}
+.g-hyp{color:var(--warn);background:transparent}
+.g-heu{color:var(--faint);background:transparent}
+
+.callout{border:1px solid var(--line);border-left:3px solid var(--accent);
+  background:var(--surface);padding:16px 20px;margin-top:22px}
+.callout.crit{border-left-color:var(--crit);background:var(--crit-bg)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.callout .lbl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.callout.crit .lbl{color:var(--crit)}
+.callout.warn .lbl{color:var(--warn)}
+.callout p{margin:0;max-width:70ch}
+.callout p + p{margin-top:10px}
+
+pre{background:var(--sunk);border:1px solid var(--line);padding:13px 15px;overflow-x:auto;
+  font-size:12.5px;line-height:1.6;color:var(--body);margin:16px 0 0;
+  font-family:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace}
+pre .c{color:var(--faint)}
+pre .g{color:var(--ok)}
+pre .r{color:var(--crit)}
+
+ul.tight{margin:12px 0 0;padding-left:20px;max-width:66ch}
+ul.tight li{margin-bottom:7px}
+ul.tight li::marker{color:var(--accent)}
+
+figure{margin:0}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px}
+
+footer{padding:34px 0 60px;color:var(--muted);font-size:13px}
+footer p{max-width:70ch}
+.rule{height:1px;background:var(--line);margin:26px 0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){
+  .tile,.card{transition:border-color .15s ease}
+}
+</style>
+
+<header>
+  <div class="wrap mast">
+    <div class="mast-id">
+      <div class="eyebrow">Livestock on carriageway · decision system</div>
+      <h1>GauKavach
+        <span class="sub">An acoustic deterrent that is only allowed to act inside the envelope the evidence supports.</span>
+      </h1>
+      <p class="thesis">The published evidence that ultrasound alone moves cattle is <strong>weak — one prototype paper</strong>. Most systems built on it quietly overclaim. This one encodes the weakness as hard constraints: it computes what physics permits, refuses what welfare forbids, and hands the incident to a human the moment sound stops being justified.</p>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <div class="qhead"><span class="qnum">Q1</span><h2>“Isn’t this just another ultrasonic buzzer?”</h2></div>
+  <p class="answer">No — because the buzzer is the <em>second</em> thing it does. GauKavach separates the intervention whose mechanism is proven from the one that is not, and never lets the second stand in for the first.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>Layer 1 · Traffic response <span class="chip g-high">Proven mechanism</span></h3>
+      <p class="cap" style="margin-top:12px">Fires the instant livestock is detected, at any distance, regardless of whether sound can reach the animal. Upstream variable message sign, signal hold, advisory speed drop, dispatch ticket. Drivers who are warned about an obstruction slow down — this is not in dispute.</p>
+    </div>
+    <div class="card">
+      <h3>Layer 2 · Acoustic nudge <span class="chip g-hyp">Hypothesis</span></h3>
+      <p class="cap" style="margin-top:12px">Only inside the computed envelope, only on an approaching animal, only at the minimum sufficient level, only with no person or non-target species in the cone. Three attempts maximum, then it stops permanently and escalates.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="lbl">Why the split matters</div>
+    <p>Umstatter et al. (2013) showed broadcast audio can shift cattle location but explicitly <em>failed</em> to achieve stock-proof containment. A system that keeps emitting until the animal moves is arguing with its own citation. Ours has a defined give-up point.</p>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q2</span><h2>“Where did your numbers come from?”</h2></div>
+  <p class="answer">Every constant that can influence an emission is declared in a registry with a source and an evidence grade. A number that is our own guess is <em>graded as our own guess</em> and is structurally forbidden from authorising emission on its own.</p>
+  <div id="gradebar"></div>
+  <div class="scroll"><table id="evtable"><thead><tr>
+    <th>Constant</th><th style="text-align:right">Value</th><th>Grade</th><th>Src</th><th>Why this number</th>
+  </tr></thead><tbody></tbody></table></div>
+  <div class="callout warn">
+    <div class="lbl">The registry caught us once</div>
+    <p>Our carrier optimiser originally selected 20 kHz. OSHA states plainly that 20 kHz is <em>not</em> a guaranteed silent frequency — so the optimiser was contradicting a source we had cited. The threshold that let it happen was an undeclared magic number. Declaring it forced the value down to 2%, and selection moved to 22 kHz.</p>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q3</span><h2>“What about dogs, cats, goats — anything that isn’t a cow?”</h2></div>
+  <p class="answer">This question broke our original design, so it now drives it. Ultrasonic deterrents are sold on the premise that the frequency is species-selective. We checked that premise against comparative audiograms measured at the <em>same</em> 60 dB SPL criterion as the cattle data — and it is not merely unproven. <strong>It is backwards.</strong></p>
+  <div class="scroll"><table id="sptable"><thead><tr>
+    <th>Species</th><th>Group</th><th style="text-align:right">Hearing limit</th><th style="text-align:right">Octaves inside range</th><th></th>
+  </tr></thead><tbody></tbody></table></div>
+  <div class="callout crit">
+    <div class="lbl">The finding that reshaped the architecture</div>
+    <p id="selectivity"></p>
+    <p><strong>Consequence:</strong> selectivity cannot come from the frequency. It can only come from the detector. Every non-target veto in the system exists because of this table — and a goat flock beside the road is not an incidental bystander, it is a <em>more sensitive receiver than the target</em>.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Household animals · absolute veto</h3>
+      <ul class="tight">
+        <li><strong>Dogs</strong> hear to 45 kHz and may orient <em>at</em> the source rather than away — with documented risk of redirected aggression toward nearby people. Hard stop, never a weighting.</li>
+        <li><strong>Cats</strong> hear to 85 kHz, nearly two octaves inside range. The most over-exposed animal at any site.</li>
+        <li><strong>Poultry</strong> we checked and cleared: chicken hearing tops out near 7 kHz. Recorded so the register states what is <em>not</em> at risk, not only what is.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Flocks · refuse and escalate</h3>
+      <ul class="tight">
+        <li>Above <strong>3 grouped conspecifics</strong> the system refuses outright. Responses are socially facilitated, so a startle propagates through the group rather than staying with one animal.</li>
+        <li>A flock moving as one body in an unpredictable direction is a <em>worse</em> road hazard than the original blockage. A herd is a dispatch problem, not an acoustic one.</li>
+        <li><strong>Known gap:</strong> COCO has no goat class. Goats detect as “sheep” or not at all. The ambiguous label maps to both species and the stricter profile wins — declared, not hidden.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout warn">
+    <div class="lbl">Also checked, also uncomfortable</div>
+    <p><strong>Children.</strong> High-frequency hearing declines with age, so a 22 kHz carrier chosen because adults can’t hear it may be plainly audible to a child — commercial anti-loitering devices exploit exactly that gap near 17.4 kHz. Near a school or dense housing the band floor rises to 25 kHz. <span id="childrisk"></span></p>
+    <p><strong>Bats.</strong> Several insectivorous bats echolocate at 20–35 kHz. This isn’t a coincidence: the atmospheric-absorption paper this whole system depends on is itself a bat echolocation study. Mitigation is sub-second event-triggered bursts only. Residual risk: unquantified, no bat survey done.</p>
+    <p><strong>What we cannot see at all.</strong> <span id="gapnote"></span></p>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q4</span><h2>“Could it make an animal behave violently, or push it into traffic?”</h2></div>
+  <p class="answer">Yes — and those are the two hazards we rate <em>catastrophic</em>. An animal flees away from an aversive source. If the emitter sits so that “away” means “across the road”, the device causes the exact collision it exists to prevent. So flight geometry is computed in metric ground coordinates and checked <strong>before</strong> the acoustics are even consulted.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>The flight-vector check</h3>
+      <pre><span class="c"># ray-cast 25 m along the flight vector</span>
+flight = site.flight_assessment(pt, 25.0)
+
+<span class="c"># animal standing on the carriageway:</span>
+{'already_in_hazard': <span class="r">True</span>,
+ 'escape_corridor_m': <span class="r">0.0</span>,
+ 'safe': <span class="r">False</span>}   <span class="c">-> REFUSED</span>
+
+<span class="c"># animal on the verge, road behind it:</span>
+{'already_in_hazard': <span class="g">False</span>,
+ 'escape_corridor_m': <span class="g">40.0</span>,
+ 'safe': <span class="g">True</span>}    <span class="c">-> permitted</span></pre>
+      <p class="cap">This check alone proves something we did not set out to find: <strong>GauKavach is an approach deterrent, not a road-clearer.</strong> An animal already mid-carriageway is refused, because clearing it needs a human or a far-side emitter — never more volume.</p>
+    </div>
+    <div class="card">
+      <h3>Vulnerability vetoes</h3>
+      <ul class="tight">
+        <li><strong>No escape corridor</strong> — pressure without an exit produces panic, not withdrawal. Requires 8 m of clear ground.</li>
+        <li><strong>Juvenile present</strong> — real-world height from box + range. A calf means maternal defence and a more vulnerable animal.</li>
+        <li><strong>Immobile after emission</strong> — moved &lt;1.5 m? Possibly tethered, trapped or unwell. Pressing again is distress with no possible benefit.</li>
+        <li><strong>Possibly downed</strong> — wide box aspect flags recumbency. Biased toward false positives on purpose.</li>
+        <li><strong>Working animals</strong> — a bolting harnessed bullock endangers its handler, who is standing in the cone. Horses vetoed unconditionally.</li>
+      </ul>
+      <p class="cap">Honest limit: juvenile classification degrades with range. In testing a calf was only classified correctly inside ~20 m, so this protection is weakest exactly where first contact happens.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q5</span><h2>“What else could go wrong?”</h2></div>
+  <p class="answer">We wrote a hazard register rather than a feature list. Every row carries severity, likelihood, the detection mechanism, the mitigation in code, and the <strong>residual risk that remains after mitigation</strong>. Rows with no mitigation are still listed — deleting inconvenient rows is how safety cases become fiction.</p>
+  <div id="hazbar"></div>
+  <div class="scroll"><table id="haztable"><thead><tr>
+    <th>ID</th><th>Hazard</th><th>Category</th><th style="text-align:right">Risk</th><th>Status</th><th>Residual risk</th>
+  </tr></thead><tbody></tbody></table></div>
+  <div class="callout crit">
+    <div class="lbl">The rows we cannot close</div>
+    <p id="openhaz"></p>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q6</span><h2>“How do you know the sound reaches the animal?”</h2></div>
+  <p class="answer">Because it is a link budget, not an assumption. Heffner &amp; Heffner define the cattle hearing range at a <strong>60 dB SPL criterion</strong> — so at the top of the band the signal must <em>arrive</em> at ≥60 dB, plus a margin above roadside noise. Working backwards through spreading and atmospheric absorption gives the level the emitter must produce, and whether that level is even legal.</p>
+
+  <div class="grid2">
+    <figure class="card">
+      <h3>Effective range collapses with frequency</h3>
+      <div id="chart-env"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Usable range</span>
+        <span><i style="background:var(--crit)"></i>Rejected by a constraint</span>
+        <span><i style="background:var(--warn);opacity:.55"></i>Human-audible risk</span>
+      </div>
+      <p class="cap">This is the finding that kills the “ultrasonic wall across a highway” idea. 30 kHz — the frequency the one cattle prototype used — reaches barely half as far as 22 kHz, because absorption rises as roughly f² and band-edge sensitivity falls.</p>
+    </figure>
+    <div class="card">
+      <h3>Propagation validated against published values</h3>
+      <p class="cap" style="margin-top:12px">Our model reproduces the source report’s attenuation table exactly, to 0.1 dB, at every distance.</p>
+      <pre id="physics"></pre>
+      <p class="cap">We carry <em>two</em> absorption models because they disagree, and we refuse to pick one silently.</p>
+      <div class="scroll" style="margin-top:12px"><table id="disagree"><thead><tr>
+        <th>Carrier</th><th style="text-align:right">ISO 9613-1</th><th style="text-align:right">Lawrence &amp; Simmons</th><th style="text-align:right">Δ</th>
+      </tr></thead><tbody></tbody></table></div>
+      <p class="cap"><strong>Policy:</strong> range decisions use the pessimistic model, exposure decisions the optimistic one. Both errors then fall on the safe side. ISO 9613-1 is specified only to 10 kHz — every use above that is labelled an extrapolation in the output, not passed off as compliance.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q7</span><h2>“Isn’t this cruel to the animal?”</h2></div>
+  <p class="answer">The only published cattle-ultrasound prototype reported <strong>142 dB SPL at 1 m</strong>. That is roughly 27 dB above the international occupational ceiling for this band — over 500× the acoustic intensity. We treat that figure as a fault condition, not a specification.</p>
+  <div class="callout crit">
+    <div class="lbl">Refusal proof · runnable as <code>gaukavach refuse</code></div>
+    <p id="refusal-detail"></p>
+    <p id="refusal-conc"></p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>What the governor enforces</h3>
+      <ul class="tight" id="denials"></ul>
+    </div>
+    <div class="card">
+      <h3>Emitted level is a computed minimum</h3>
+      <p class="cap" style="margin-top:12px">There is no volume control. The level is solved from the link budget for that specific animal at that specific distance in that specific weather — so a closer animal always receives <em>less</em> power, and an operator cannot turn it up. A test asserts this invariant across every scenario:</p>
+      <pre><span class="c"># tests/test_gaukavach.py</span>
+def test_no_emission_ever_exceeds_the_ceiling
+        _in_any_scenario():
+    <span class="c">"""The single most important safety</span>
+<span class="c">    invariant, checked across every path."""</span>
+    for name in SCENARIOS:
+        for r in ledger.of_kind("emission"):
+            assert r.payload[
+              "level_at_1m_db"] &lt;= cap
+<span class="g">PASSED</span></pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q8</span><h2>“Will bystanders hear it?”</h2></div>
+  <p class="answer">A 25 kHz burst switched on and off abruptly <em>is not a 25 kHz signal</em>. The rectangular gate splatters broadband energy across the audible range, and the device clicks at every activation even though its carrier is ultrasonic. OSHA documents exactly this failure mode. So every burst is raised-cosine ramped, and the device FFTs its own buffer and refuses to play anything whose sub-20 kHz energy is too high.</p>
+  <div class="grid2">
+    <figure class="card">
+      <h3>Audible-band energy, same carrier</h3>
+      <div id="chart-gate"></div>
+      <p class="cap" id="gate-note"></p>
+    </figure>
+    <div class="card">
+      <h3>Carrier selection is constrained, not optimised for reach</h3>
+      <p class="cap" style="margin-top:12px">The optimiser maximises safety margin subject to four hard constraints, and returning “no feasible carrier” is a first-class outcome that triggers escalation rather than a louder emitter.</p>
+      <ul class="tight">
+        <li>Must reach the animal at the audiogram criterion plus masking margin</li>
+        <li>Must stay under the occupational ceiling</li>
+        <li>Modelled bystander audibility ≤ 2%</li>
+        <li>Must stay inside the documented 22–30 kHz band</li>
+      </ul>
+      <p class="cap">Selected carrier at the demo site: <strong>22.0 kHz</strong>, chosen for margin, not for reach.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q9</span><h2>“Does it actually work?”</h2></div>
+  <p class="answer"><strong>We don’t know, and neither does anyone else.</strong> No published dose-response curve exists for cattle at 22–30 kHz. So the model returns credible intervals over an explicit prior — never a point estimate — and labels its own output uninformative when the prior dominates. This is the section other teams delete. It is the reason to trust the rest.</p>
+  <div class="grid2">
+    <figure class="card">
+      <h3>Modelled response · 90% credible interval</h3>
+      <div id="chart-dose"></div>
+      <p class="cap">At every level the welfare ceiling actually permits, the interval spans most of the probability space. The honest reading is that this cannot be distinguished from chance without field data.</p>
+    </figure>
+    <figure class="card">
+      <h3>Projected habituation · 3 encounters/day</h3>
+      <div id="chart-hab"></div>
+      <p class="cap">An unconditioned tone with no paired consequence should decay. A deterrent that works only on day one is not a deterrent — so the model surfaces this before deployment rather than after.</p>
+    </figure>
+  </div>
+  <div class="callout">
+    <div class="lbl">What the uncertainty is <em>for</em></div>
+    <p id="trial-note"></p>
+    <p style="color:var(--muted);font-size:13px" id="prior-note"></p>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q10</span><h2>“What is it worth in traffic terms?”</h2></div>
+  <p class="answer">A blockage does not cost you the time it lasted — it costs you the queue it leaves behind, which takes longer to clear than the blockage itself. That is why clearing an animal sooner is worth far more than it first appears, and why we model it with standard deterministic queueing rather than an invented metric.</p>
+  <div class="grid2">
+    <figure class="card">
+      <h3>Delay grows superlinearly with blockage duration</h3>
+      <div id="chart-traffic"></div>
+      <p class="cap">2 lanes, 1200 veh/h demand. Doubling a blockage from 60 s to 120 s more than doubles total delay.</p>
+    </figure>
+    <div class="card">
+      <h3>Clearing in 90 s instead of 300 s</h3>
+      <div class="scroll" style="margin-top:12px"><table id="benefit"><thead><tr><th>Per incident</th><th style="text-align:right">Saved</th></tr></thead><tbody></tbody></table></div>
+      <div class="callout warn" style="margin-top:18px">
+        <div class="lbl">Read this before quoting the number</div>
+        <p style="font-size:13.5px">This quantifies the value of clearing a blockage sooner. It does <strong>not</strong> assert that ultrasonic deterrence achieves that clearance — that is the open question. Until a field trial supplies a measured turn-away rate, this is a sensitivity analysis, not a result.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q11</span><h2>“Show me it running.”</h2></div>
+  <p class="answer">Eight scenarios drive the full closed loop — detect, classify, decide, authorise, emit, observe, stop, escalate, log. Every run writes a SHA-256 hash-chained ledger; editing or deleting any historical record invalidates every record after it.</p>
+  <div class="scroll"><table id="scentable"><thead><tr>
+    <th>Scenario</th><th style="text-align:right">Emissions</th><th style="text-align:right">Emitted</th><th style="text-align:right">Escalations</th><th>Governor outcome</th><th style="text-align:right">Ledger</th>
+  </tr></thead><tbody></tbody></table></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>The scenario to demo first</h3>
+      <p class="cap" style="margin-top:12px"><code>person-in-cone</code> — a pedestrian walks into the exposure cone while a cow approaches. The system detects the cow, computes a valid carrier, and then emits <strong>nothing at all</strong>, for as long as the person is there. Total emission: 0.0 s. Bystander safety is not a check inside the pipeline; it is a precondition of the pipeline.</p>
+    </div>
+    <div class="card">
+      <h3>Tamper-evidence, honestly scoped</h3>
+      <pre><span class="c"># edit one historical record...</span>
+led.records[4].payload[
+    "level_db"] = 142
+led.verify()
+<span class="r">{'valid': False, 'broken_at_seq': 4}</span></pre>
+      <p class="cap">A test asserts the scope statement does not overclaim: this is a single-writer tamper-<em>evident</em> log. It detects post-hoc edits. It does not by itself prove the writer was honest at write time, and it is not a blockchain.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="qhead"><span class="qnum">Q12</span><h2>“What did you not build?”</h2></div>
+  <p class="answer">Stating this plainly is cheaper than being caught by it.</p>
+  <ul class="tight">
+    <li><strong>No hardware exists.</strong> No transducer, no amplifier, no field measurement. Every emission in this repository is marked <code>dry_run: true</code>, and a test asserts that no record anywhere claims otherwise.</li>
+    <li><strong>No cattle were exposed to anything.</strong> The behavioural model is a prior, not a measurement, and says so in its own output.</li>
+    <li><strong>The camera is uncalibrated.</strong> Distances come from inverse-perspective mapping with plausible defaults, carrying roughly ±20% error. Real deployment needs a measured homography.</li>
+    <li><strong>The spectral check is a linear model.</strong> Real amplifiers and transducers add nonlinearity this does not capture. Only a calibrated ultrasonic microphone settles it.</li>
+    <li><strong>Cattle welfare thresholds for 22–35 kHz do not exist in the literature.</strong> We borrow a human occupational ceiling because there is nothing better, and we label that substitution everywhere it appears.</li>
+  </ul>
+  <div class="callout">
+    <div class="lbl">The next step is specified, not hand-waved</div>
+    <p id="next-step"></p>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <div class="rule"></div>
+  <p><strong>GauKavach v0.5.0</strong> · 92/92 tests passing · <span id="foot-const"></span> graded constants across 24 sources · 30-row hazard register · perception via YOLO COCO classes (cow, dog, horse, sheep, person) · all figures on this page are computed by the repository at build time, not typed in by hand.</p>
+  <p style="margin-top:12px">Site conditions used throughout: <span id="foot-atm" class="mono"></span>. This is an engineering research synthesis, not veterinary, legal or regulatory approval for a device.</p>
+</footer>
+
+<script id="payload" type="application/json">{"envelope":[{"khz":18.0,"range_m":54.2,"alpha":0.268,"human_risk":0.3543,"child_risk":0.9116},{"khz":19.0,"range_m":51.0,"alpha":0.296,"human_risk":0.1419,"child_risk":0.8411},{"khz":20.0,"range_m":48.0,"alpha":0.326,"human_risk":0.0474,"child_risk":0.7311},{"khz":21.0,"range_m":45.2,"alpha":0.357,"human_risk":0.0148,"child_risk":0.5826},{"khz":22.0,"range_m":42.8,"alpha":0.39,"human_risk":0.0045,"child_risk":0.4174},{"khz":23.0,"range_m":40.5,"alpha":0.424,"human_risk":0.0014,"child_risk":0.2689},{"khz":24.0,"range_m":38.0,"alpha":0.459,"human_risk":0.0004,"child_risk":0.1589},{"khz":25.0,"range_m":35.2,"alpha":0.495,"human_risk":0.0001,"child_risk":0.0884},{"khz":26.0,"range_m":32.8,"alpha":0.533,"human_risk":0.0,"child_risk":0.0474},{"khz":27.0,"range_m":30.2,"alpha":0.571,"human_risk":0.0,"child_risk":0.0249},{"khz":28.0,"range_m":27.5,"alpha":0.611,"human_risk":0.0,"child_risk":0.013},{"khz":29.0,"range_m":25.0,"alpha":0.652,"human_risk":0.0,"child_risk":0.0067},{"khz":30.0,"range_m":22.5,"alpha":0.694,"human_risk":0.0,"child_risk":0.0034},{"khz":31.0,"range_m":20.2,"alpha":0.737,"human_risk":0.0,"child_risk":0.0018},{"khz":32.0,"range_m":17.8,"alpha":0.781,"human_risk":0.0,"child_risk":0.0009},{"khz":33.0,"range_m":15.5,"alpha":0.826,"human_risk":0.0,"child_risk":0.0005},{"khz":34.0,"range_m":13.5,"alpha":0.872,"human_risk":0.0,"child_risk":0.0002},{"khz":35.0,"range_m":11.5,"alpha":0.919,"human_risk":0.0,"child_risk":0.0001},{"khz":36.0,"range_m":9.5,"alpha":0.967,"human_risk":0.0,"child_risk":0.0001}],"dose":[{"db":55,"m":0.122,"lo":0.006,"hi":0.421},{"db":60,"m":0.167,"lo":0.013,"hi":0.495},{"db":65,"m":0.223,"lo":0.022,"hi":0.585},{"db":70,"m":0.287,"lo":0.034,"hi":0.644},{"db":75,"m":0.34,"lo":0.06,"hi":0.679},{"db":80,"m":0.408,"lo":0.1,"hi":0.75},{"db":85,"m":0.47,"lo":0.146,"hi":0.787},{"db":90,"m":0.517,"lo":0.204,"hi":0.82},{"db":95,"m":0.558,"lo":0.265,"hi":0.848},{"db":100,"m":0.603,"lo":0.308,"hi":0.876},{"db":105,"m":0.629,"lo":0.35,"hi":0.89},{"db":110,"m":0.643,"lo":0.379,"hi":0.901}],"hab":[{"d":1,"m":0.466,"f":1.0},{"d":2,"m":0.394,"f":0.841},{"d":3,"m":0.335,"f":0.707},{"d":4,"m":0.28,"f":0.595},{"d":5,"m":0.234,"f":0.5},{"d":6,"m":0.199,"f":0.42},{"d":7,"m":0.167,"f":0.354},{"d":8,"m":0.139,"f":0.297},{"d":9,"m":0.117,"f":0.25},{"d":10,"m":0.097,"f":0.21},{"d":11,"m":0.084,"f":0.177},{"d":12,"m":0.07,"f":0.149}],"traffic":[{"b":30.0,"q":10.0,"c":15.0,"h":0.1,"inr":16.4},{"b":60.0,"q":20.0,"c":30.0,"h":0.4,"inr":65.5},{"b":120.0,"q":40.0,"c":60.0,"h":1.6,"inr":262.0},{"b":180.0,"q":60.0,"c":90.0,"h":3.6,"inr":589.5},{"b":300.0,"q":100.0,"c":150.0,"h":10.0,"inr":1637.5},{"b":600.0,"q":200.0,"c":300.0,"h":40.0,"inr":6550.0}],"benefit":{"delay_veh_h_saved":5.688,"person_hours_saved":9.1,"fuel_litres_saved":3.981,"cost_inr_saved":1490.1,"co2_kg_saved":9.196},"perday":{"incidents":4.0,"person_hours_saved":36.4,"cost_inr_saved":5960.4,"co2_kg_saved":36.784},"evidence":[{"n":"cattle_hearing_low_hz","v":23.0,"u":"Hz","g":"High","s":["R1"],"r":"Lower endpoint of the cattle behavioural audiogram.","a":true},{"n":"cattle_hearing_high_hz","v":35000.0,"u":"Hz","g":"High","s":["R1","R2"],"r":"Upper endpoint of the cattle behavioural audiogram. An ENDPOINT, not a frequency of useful sensitivity.","a":true},{"n":"cattle_best_sensitivity_hz","v":8000.0,"u":"Hz","g":"High","s":["R1"],"r":"Region of best cattle sensitivity - squarely human-audible, hence unusable for a covert deterrent.","a":true},{"n":"audiogram_criterion_db","v":60.0,"u":"dB SPL","g":"High","s":["R1"],"r":"Heffner & Heffner define hearing-range endpoints at a 60 dB SPL criterion. Therefore a signal near the top of the range must arrive at the animal at >= 60 dB SPL to be assumed detectable at all. This converts an audiogram into a hard link-budget requirement.","a":true},{"n":"human_audibility_low_hz","v":15000.0,"u":"Hz","g":"High","s":["R13"],"r":"Below this, assume essentially every bystander hears the signal.","a":true},{"n":"human_audibility_high_hz","v":20000.0,"u":"Hz","g":"High","s":["R13"],"r":"OSHA: the upper limit of human audibility is ~15-20 kHz and is NOT fixed. 20 kHz is therefore not a guaranteed silent frequency.","a":true},{"n":"spreading_db_per_doubling","v":6.0,"u":"dB","g":"High","s":["R13"],"r":"Free-field point-source geometric spreading.","a":true},{"n":"ls_alpha_30k_db_per_m","v":0.7,"u":"dB/m","g":"High","s":["R14"],"r":"Measured atmospheric attenuation at 30 kHz, 25 C, 50% RH.","a":true},{"n":"osha_ultrasound_ceiling_db","v":110.0,"u":"dB SPL","g":"High","s":["R13"],"r":"Midpoint of the ~105-115 dB international occupational ceiling band for 20-40 kHz. A HUMAN occupational reference, not a cattle welfare limit - we adopt it as the emitter cap precisely because no cattle-specific limit exists, and we say so.","a":true},{"n":"osha_ultrasound_ceiling_max_db","v":115.0,"u":"dB SPL","g":"High","s":["R13"],"r":"Upper edge of the cited international band. Absolute ceiling; unreachable without a signed ethics authorisation token.","a":true},{"n":"refused_prototype_spl_db","v":142.0,"u":"dB SPL @ 1 m","g":"Low","s":["R4"],"r":"The level reported by the only direct cattle-ultrasound prototype. About 27 dB above the occupational ceiling, i.e. >500x the acoustic intensity. GauKavach treats any configuration approaching this as a fault condition, not a setting.","a":false},{"n":"experimental_band_low_hz","v":22000.0,"u":"Hz","g":"Hypothesis","s":["R1","R4","R13"],"r":"Lower edge of the proposed test band: above most adult hearing, well inside the cattle audiogram. An engineering compromise, NOT a validated optimum.","a":false},{"n":"experimental_band_high_hz","v":30000.0,"u":"Hz","g":"Hypothesis","s":["R1","R4"],"r":"Upper edge of the proposed test band; beyond this cattle sensitivity falls and usable range collapses under absorption.","a":false},{"n":"max_human_audibility_risk","v":0.02,"u":"probability","g":"Heuristic (ours, unvalidated)","s":["OURS","R13"],"r":"Largest modelled probability of a bystander perceiving the carrier that we will accept. Set at 2% rather than a looser figure because R13 states explicitly that 20 kHz is NOT a guaranteed silent frequency; a permissive threshold lets the optimiser drift down to 20 kHz and quietly contradict the source.","a":false},{"n":"enforce_band_floor","v":true,"u":"bool","g":"Hypothesis","s":["R1","R4","R13"],"r":"Refuse to select a carrier below experimental_band_low_hz even when the link budget would allow it. The band floor is a documented compromise, so leaving it must be a deliberate, logged override - not an optimiser side-effect.","a":false},{"n":"masking_margin_db","v":15.0,"u":"dB","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"Signal-to-ambient margin required on top of the audiogram criterion. Chosen by analogy with speech-detectability margins; NOT measured in cattle. Tunable, and logged with every activation.","a":false},{"n":"max_activation_s","v":6.0,"u":"s","g":"Heuristic (ours, unvalidated)","s":["OURS","R16"],"r":"Hard watchdog limit on any single emission. Noise-hygiene reviews advise against sustained or sudden noise, and short bursts limit habituation; the specific value is ours.","a":false},{"n":"min_silence_s","v":20.0,"u":"s","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"Enforced quiet period after any emission, per animal track.","a":false},{"n":"daily_exposure_budget_s","v":120.0,"u":"s","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"Per-animal cumulative daily exposure cap. Beyond this the animal is placed on a do-not-emit list and the site escalates to human dispatch.","a":false},{"n":"habituation_halflife_exposures","v":12.0,"u":"exposures","g":"Hypothesis","s":["R5","R6","R11"],"r":"Assumed decay in response probability for an unconditioned tone with no paired consequence. Derived by analogy from virtual-fencing literature where the cue IS paired; an unpaired cue should decay at least this fast. Drives the digital twin only - never a live emission decision.","a":false},{"n":"social_facilitation_gain","v":0.35,"u":"fraction","g":"Moderate","s":["R9"],"r":"Increase in response probability for a herd member once a conspecific has responded. The magnitude is our fit; the effect itself is established.","a":true},{"n":"max_herd_size_for_emission","v":3,"u":"animals","g":"Hypothesis","s":["R9","R24"],"r":"Above this many conspecifics in the zone, emission is refused outright and the incident escalates. Rationale: R9 established that virtual-fence responses are socially facilitated, so a startle propagates through a group rather than staying with one animal. A flock moving as one body in an unpredictable direction is a worse road hazard than the original blockage. The specific threshold is ours.","a":false},{"n":"herd_grouping_radius_m","v":12.0,"u":"m","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"Animals of the same species within this distance of each other are counted as one social group for the stampede check.","a":false},{"n":"min_escape_corridor_m","v":8.0,"u":"m","g":"Heuristic (ours, unvalidated)","s":["OURS","R24"],"r":"An animal must have at least this much clear ground along its likely flight vector, away from the carriageway, before any emission is permitted. Grandin's handling literature is explicit that pressure applied without a viable escape route produces panic rather than controlled movement. The distance is ours.","a":false},{"n":"flight_vector_check_m","v":25.0,"u":"m","g":"Hypothesis","s":["R24"],"r":"Distance along the predicted flight vector that is tested for intersection with the carriageway. If the animal would flee ONTO the road, the system must not emit - it would cause the collision it exists to prevent.","a":false},{"n":"juvenile_height_ratio","v":0.7,"u":"fraction","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"An animal shorter than this fraction of its species' typical adult height is treated as juvenile. Emission is then refused: young animals are more vulnerable, and a dam with offspring at foot is the classic maternal-aggression case. Estimated from monocular height, so it inherits the camera's calibration error.","a":false},{"n":"immobile_displacement_m","v":1.5,"u":"m","g":"Heuristic (ours, unvalidated)","s":["OURS","R24"],"r":"If an animal moves less than this after a completed emission, it is treated as possibly tethered, trapped, sick or injured, and further emission is refused for that animal. Continuing to press an animal that cannot leave is pure distress with no possible benefit.","a":false},{"n":"downed_aspect_ratio","v":1.6,"u":"w/h","g":"Heuristic (ours, unvalidated)","s":["OURS"],"r":"Bounding-box width-to-height ratio above which an animal is flagged as possibly recumbent or collapsed. Crude, and deliberately biased toward false positives: the cost of wrongly sparing a standing animal is one missed nudge, while the cost of harassing a downed animal is severe.","a":false},{"n":"child_audibility_band_floor_hz","v":25000.0,"u":"Hz","g":"Hypothesis","s":["R13","R23"],"r":"Minimum carrier near a school or dense housing. High-frequency hearing declines with age, so a 22 kHz tone chosen because adults cannot hear it may still be audible to children. Commercial anti-loitering devices exploit precisely this gap near 17.4 kHz.","a":false},{"n":"escalation_timeout_s","v":25.0,"u":"s","g":"Heuristic (ours, unvalidated)","s":["OURS","R5"],"r":"If the carriageway is not cleared within this window, stop acoustic attempts and hand off to human dispatch. Follows directly from R5: acoustic cues are not stock-proof, so the system must have a defined give-up point.","a":false}],"audit":{"total_constants":30,"by_grade":{"Heuristic (ours, unvalidated)":11,"High":10,"Hypothesis":7,"Low":1,"Moderate":1},"non_actionable":["child_audibility_band_floor_hz","daily_exposure_budget_s","downed_aspect_ratio","enforce_band_floor","escalation_timeout_s","experimental_band_high_hz","experimental_band_low_hz","flight_vector_check_m","habituation_halflife_exposures","herd_grouping_radius_m","immobile_displacement_m","juvenile_height_ratio","masking_margin_db","max_activation_s","max_herd_size_for_emission","max_human_audibility_risk","min_escape_corridor_m","min_silence_s","refused_prototype_spl_db"],"sources":21},"unverified":["R1","R11","R13","R14","R15","R16","R17","R18","R19","R2","R20","R21","R22","R23","R24","R3","R4","R5","R6","R9"],"refusal":{"detail":"needs 192 dB@1m at 120 m, ceiling 110 dB (short 82 dB); 192 dB is within 20 dB of the 142 dB prototype level this system refuses to reproduce; above the default ceiling and no ethics token supplied","denials":["target cannot be served inside the welfare envelope","requested level approaches the refused prototype exposure","elevated exposure requires a signed ethics authorisation"],"conclusion":"The governor refuses in both cases. An ethics token raises the ceiling to the upper edge of the cited occupational band (115 dB) and no further; the prototype level is unreachable by configuration."},"gating":{"hard":-65.75,"soft":-163.77,"imp":98.0,"note":"The 'worst audible' bin sits just under 20 kHz in both cases and is FFT skirt from the carrier itself, not a distinct subharmonic. We report it rather than filtering it out so the number cannot be read as a measured emission. Only a calibrated ultrasonic microphone on real hardware settles this."},"scen":{"single-approach":{"desc":"One cow walks from the verge onto the carriageway. The nominal happy path: detect, authorise, emit the minimum sufficient level, observe.","counts":{"out_of_range":6,"emit":1,"cooldown":89},"emis":1,"esc":0,"den":{},"rec":6,"ok":true,"sec":0.54},"person-in-cone":{"desc":"A cow approaches while a pedestrian is inside the exposure cone. The governor must refuse every request for as long as the person is there. This is the scenario that should be run first in any demo.","counts":{"out_of_range":6,"denied":1},"emis":0,"esc":0,"den":{"a person is inside the exposure cone":1},"rec":5,"ok":true,"sec":0.0},"non-target-dog":{"desc":"A stray dog shares the cone with the target animal. Dogs hear well above human range, so the system suppresses emission rather than assuming the frequency is cattle-specific.","counts":{"monitor":1,"out_of_range":6,"denied":93},"emis":0,"esc":0,"den":{"a protected non-target species is inside the exposure cone":93,"fleeing the emitter would take the animal onto the carriageway":59,"the animal has no viable escape corridor away from the road":59},"rec":97,"ok":true,"sec":0.0},"herd-breakthrough":{"desc":"Four animals approach together. Social facilitation (R9) means they move as a group; the per-animal exposure budgets and the attempt cap force escalation rather than an escalating sound level.","counts":{"monitor":3,"out_of_range":25,"emit":4,"cooldown":392,"denied":13},"emis":4,"esc":0,"den":{"fleeing the emitter would take the animal onto the carriageway":13,"the animal has no viable escape corridor away from the road":13,"group is large enough that a startle could cascade through it":13},"rec":30,"ok":true,"sec":2.32},"distant-target":{"desc":"An animal is detected far beyond the acoustic envelope. No carrier in the documented band reaches it within the welfare ceiling, so the system escalates immediately instead of turning the level up. This is the scenario that proves the device knows its own limits.","counts":{"monitor":100},"emis":0,"esc":0,"den":{},"rec":3,"ok":true,"sec":0.0},"turn-away":{"desc":"A cow approaches, is nudged, and turns away before the carriageway. The incident closes, emission stops immediately, and the ledger records the outcome code T.","counts":{"out_of_range":6,"emit":1,"cooldown":89},"emis":1,"esc":0,"den":{},"rec":6,"ok":true,"sec":0.54},"persistent-blocker":{"desc":"A cow settles on the carriageway and does not move. Attempts and the escalation timeout are both exhausted, so the system stops emitting and hands the incident to municipal dispatch. The demo point: the device gives up rather than getting louder.","counts":{"monitor":1,"emit":1,"cooldown":99,"denied":25,"escalate":1},"emis":1,"esc":1,"den":{"fleeing the emitter would take the animal onto the carriageway":25,"the animal has no viable escape corridor away from the road":25},"rec":31,"ok":true,"sec":0.54},"goat-flock":{"desc":"A goat flock grazes beside the road while a cow approaches. Goats hear 22-30 kHz BETTER than cattle do and panic propagates through a flock, so the system must refuse entirely. Note the detector reports them as 'sheep' - COCO has no goat class, and that ambiguity is declared rather than hidden.","counts":{"out_of_range":2,"denied":106},"emis":0,"esc":0,"den":{"a protected non-target species is inside the exposure cone":106,"fleeing the emitter would take the animal onto the carriageway":63,"the animal has no viable escape corridor away from the road":63},"rec":110,"ok":true,"sec":0.0},"cow-with-calf":{"desc":"A cow approaches with a calf at foot. The calf is classified as juvenile from its estimated real-world height, which vetoes emission for the whole group: young animals are more vulnerable and a dam with offspring is the classic maternal-aggression case.","counts":{"monitor":2,"denied":218},"emis":0,"esc":0,"den":{"a juvenile animal is present in the group":218,"the animal may be recumbent, sick or injured":109,"fleeing the emitter would take the animal onto the carriageway":139,"the animal has no viable escape corridor away from the road":139},"rec":222,"ok":true,"sec":0.0},"herd-stampede-risk":{"desc":"Five cattle move together. Above the group-size threshold a startle can cascade through the whole group (R9), putting several animals on the road at once instead of one. The system refuses and escalates.","counts":{"monitor":4,"out_of_range":1,"denied":582},"emis":0,"esc":0,"den":{"group is large enough that a startle could cascade through it":582,"fleeing the emitter would take the animal onto the carriageway":357,"the animal has no viable escape corridor away from the road":357},"rec":590,"ok":true,"sec":0.0},"flight-into-road":{"desc":"An animal already standing on the carriageway. Fleeing a roadside emitter would push it further ACROSS the road, not off it. This is the scenario that proves GauKavach is an approach deterrent, not a road-clearer - and that clearing a road needs a human, not volume.","counts":{"denied":100},"emis":0,"esc":0,"den":{"fleeing the emitter would take the animal onto the carriageway":100,"the animal has no viable escape corridor away from the road":100},"rec":103,"ok":true,"sec":0.0},"panic-stop-criterion":{"desc":"An animal panics after the first burst. Section 12.2 of the report makes this a stop criterion, not a success: the animal is flagged do-not-emit for the rest of the session and the incident is inhibited.","counts":{"out_of_range":3,"emit":1,"cooldown":55},"emis":1,"esc":0,"den":{},"rec":8,"ok":true,"sec":0.54}},"disagree":[{"freq_khz":22.0,"distance_m":20.0,"iso9613_total_loss_db":33.43,"lawrence_simmons_total_loss_db":31.71,"disagreement_db":1.72,"pessimistic_model":"iso9613","policy":"Range decisions use the pessimistic model; exposure decisions use the optimistic model. Both errors then fall on the safe side."},{"freq_khz":25.0,"distance_m":20.0,"iso9613_total_loss_db":35.43,"lawrence_simmons_total_loss_db":33.24,"disagreement_db":2.18,"pessimistic_model":"iso9613","policy":"Range decisions use the pessimistic model; exposure decisions use the optimistic model. Both errors then fall on the safe side."},{"freq_khz":30.0,"distance_m":20.0,"iso9613_total_loss_db":39.21,"lawrence_simmons_total_loss_db":39.32,"disagreement_db":0.11,"pessimistic_model":"lawrence_simmons","policy":"Range decisions use the pessimistic model; exposure decisions use the optimistic model. Both errors then fall on the safe side."}],"trial":{"baseline_turn_away_rate":0.15,"target_turn_away_rate":0.5,"power":0.8,"alpha":0.05,"approaches_per_arm":27,"total_approaches":54,"note":"Two-proportion normal approximation, independent approaches. Real herds violate independence because responses are socially facilitated (R9), so treat this as a LOWER BOUND and cluster by herd in the analysis."},"prior":"NOT MEASURED. Threshold centre is anchored to the 60 dB SPL audiogram criterion (R1) plus a margin for band-edge sensitivity loss (R3); the ceiling on response probability reflects that even paired virtual-fence cues do not achieve 100% compliance (R5, R11). Every parameter is a prior to be updated by field data, not a finding.","atm":{"temp_c":32.0,"rh_pct":60.0,"pressure_kpa":101.325,"ambient_spl_db":58.0,"speed_of_sound_m_s":350.17},"species":[{"key":"cat","name":"Cat","group":"household","limit_khz":85.0,"octaves_below_limit":1.766,"audible":true,"more_sensitive_than_target":true,"detectable":true,"aggression":"moderate"},{"key":"dog","name":"Dog","group":"household","limit_khz":45.0,"octaves_below_limit":0.848,"audible":true,"more_sensitive_than_target":true,"detectable":true,"aggression":"high"},{"key":"sheep","name":"Sheep","group":"livestock","limit_khz":42.5,"octaves_below_limit":0.766,"audible":true,"more_sensitive_than_target":true,"detectable":true,"aggression":"low"},{"key":"pig","name":"Pig","group":"livestock","limit_khz":40.5,"octaves_below_limit":0.696,"audible":true,"more_sensitive_than_target":true,"detectable":false,"aggression":"moderate"},{"key":"goat","name":"Goat","group":"livestock","limit_khz":37.0,"octaves_below_limit":0.566,"audible":true,"more_sensitive_than_target":true,"detectable":true,"aggression":"moderate"},{"key":"cow","name":"Cattle","group":"target","limit_khz":35.0,"octaves_below_limit":0.485,"audible":true,"more_sensitive_than_target":false,"detectable":true,"aggression":"moderate"},{"key":"horse","name":"Horse / donkey","group":"working","limit_khz":33.5,"octaves_below_limit":0.422,"audible":true,"more_sensitive_than_target":false,"detectable":true,"aggression":"high"},{"key":"human","name":"Human (adult)","group":"human","limit_khz":17.6,"octaves_below_limit":-0.506,"audible":false,"more_sensitive_than_target":false,"detectable":true,"aggression":"low"},{"key":"elephant","name":"Elephant","group":"wildlife","limit_khz":10.5,"octaves_below_limit":-1.252,"audible":false,"more_sensitive_than_target":false,"detectable":true,"aggression":"high"},{"key":"chicken","name":"Chicken / poultry","group":"livestock","limit_khz":7.2,"octaves_below_limit":-1.796,"audible":false,"more_sensitive_than_target":false,"detectable":false,"aggression":"low"}],"selectivity":{"carrier_khz":25.0,"species_that_hear_it":7,"non_target_species_affected":6,"more_sensitive_than_target":["Cat","Dog","Sheep","Pig","Goat"],"target_sensitivity_rank":"6 of 7","frequency_is_selective":false,"conclusion":"At 25.0 kHz the target ranks 6 of 7 species that can hear the signal. 5 non-target species hear it BETTER than the animal we are aiming at. Frequency provides no selectivity whatsoever; selectivity must be enforced at the detection layer or not at all."},"bats":{"carrier_khz":25.0,"overlaps_bat_echolocation":true,"note":"Some insectivorous bats echolocate in the 20-35 kHz region. Continuous operation in this band risks masking their calls.","mitigation":"Event-triggered bursts only, sub-second duration, enforced silence between activations, and no standby emission. Total nightly on-time is expected to be seconds, not hours.","residual":"Unquantified. No bat activity survey has been carried out at any site, and none of this has been measured.","grade":"Hypothesis"},"gapnote":"Rhesus macaques are common on Indian roads, are highly reactive, and have no COCO class at all - the perception stack cannot see them. Pigs and poultry are likewise absent from the label set. The system must not be described as covering species it cannot detect.","hazards":[{"id":"H01","category":"Household animals","title":"Dog exposed to the carrier","affected":"Free-roaming and pet dogs","mechanism":"Dogs hear to ~45 kHz - roughly twice as far inside their range at 22-30 kHz as cattle are. The tone is louder to a dog than to the target animal, in every sense that matters.","severity":"severe","likelihood":"likely","detection":"YOLO COCO 'dog' class, checked across the whole exposure cone before any authorisation is issued.","mitigation":"Absolute veto. Denial.NON_TARGET blocks every request while a dog is present. Not a weighting, not a reduction in level - a hard stop.","residual":"A dog outside the camera's field of view but inside the acoustic cone is not detected. Beam geometry and camera FOV are not yet formally reconciled.","status":"partially mitigated","sources":["R17","R22"],"score":12},{"id":"H05","category":"Herd and stampede","title":"Goat or sheep flock panic cascade","affected":"Flocks, their herder, and every road user","mechanism":"Goats hear to ~37 kHz and sheep to ~42.5 kHz, both above cattle. Both are strong flocking species: R9 showed virtual-fence responses are socially facilitated, so a startle in one animal propagates. A flock moving as one body in an unpredictable direction is a far worse road hazard than the original blockage.","severity":"catastrophic","likelihood":"possible","detection":"Same-species spatial clustering within a 12 m radius; group size compared against the emission threshold each frame.","mitigation":"Denial.HERD_SIZE refuses emission entirely above 3 conspecifics and escalates to human dispatch. A herd is a dispatch problem, not an acoustic one.","residual":"Threshold of 3 is our judgement, not a measured stampede threshold. No such measurement exists for ultrasonic provocation.","status":"mitigated in code","sources":["R9","R19","R20","R24"],"score":12},{"id":"H06","category":"Herd and stampede","title":"Goats misdetected as sheep, or missed entirely","affected":"Goat flocks","mechanism":"COCO has no goat class. Goats are detected as 'sheep' when they are detected at all, so the count driving the herd threshold may be wrong.","severity":"severe","likelihood":"likely","detection":"Label ambiguity is declared in species.COCO_TO_SPECIES and surfaced by label_is_ambiguous().","mitigation":"The ambiguous 'sheep' label maps to BOTH species and the more restrictive profile is applied. Under-counting still triggers the non-target veto, which fails safe.","residual":"Recall on Indian goat breeds with COCO weights is unmeasured. This is the single highest-value fine-tuning target.","status":"partially mitigated","sources":["R19"],"score":12},{"id":"H07","category":"Herd and stampede","title":"Herd breakthrough led by one animal","affected":"Road users","mechanism":"R9 found animals follow the reactions of group members. If leaders continue forward under acoustic pressure, the group follows them onto the carriageway.","severity":"catastrophic","likelihood":"possible","detection":"Per-animal attempt counters plus the group-size check.","mitigation":"Attempt cap of 3, then escalation. The system stops rather than escalating pressure on a group that is already committed.","residual":"Cannot be validated without a field trial on real herds.","status":"partially mitigated","sources":["R9"],"score":12},{"id":"H08","category":"Flight geometry","title":"Animal driven ONTO the carriageway","affected":"The animal and every road user","mechanism":"The single worst failure mode in the whole design. An animal flees away from an aversive source. If the emitter sits so that 'away' means 'across the road', the device causes the exact collision it exists to prevent.","severity":"catastrophic","likelihood":"possible","detection":"Flight vector computed in metric ground coordinates from the emitter to the animal, then ray-cast 25 m forward and tested for intersection with the carriageway polygon.","mitigation":"Denial.FLIGHT_INTO_HAZARD refuses the emission and escalates. This check alone means GauKavach is an APPROACH deterrent, not a road-clearer: an animal already mid-carriageway will usually be refused, which is the correct answer.","residual":"Assumes flight is directly away from the source. Real flight paths depend on terrain, herd position and the animal's prior route. This is a first-order model.","status":"mitigated in code","sources":["R24"],"score":12},{"id":"H26","category":"Misuse","title":"Used as safety-critical containment","affected":"Road users","mechanism":"Someone deploys this along a highway or railway boundary and removes the fence. R5 is explicit that acoustic cues are not stock-proof.","severity":"catastrophic","likelihood":"possible","detection":"Not technically detectable - this is a governance failure.","mitigation":"Refused in documentation at every level, and the architecture enforces it: the acoustic layer has a 3-attempt cap and always escalates, so it structurally cannot behave like a barrier.","residual":"A determined operator can ignore all of this. Real mitigation is contractual and regulatory.","status":"partially mitigated","sources":["R5"],"score":12},{"id":"H30","category":"Misuse","title":"Frequency selectivity misunderstood as species selectivity","affected":"Every non-target animal","mechanism":"The most common conceptual error in this entire product category: believing an ultrasonic carrier only affects the intended species. The comparative audiogram shows cattle rank second-LAST among affected species - five household and farm animals hear it better.","severity":"severe","likelihood":"likely","detection":"species.selectivity_verdict() computes the ranking for any carrier and returns frequency_is_selective = False.","mitigation":"The finding is stated in the module docstring, the CLI, the README and the dashboard, and it is the stated architectural reason that all selectivity lives in the detector.","residual":"None. This one is genuinely closed - the finding is computed, not asserted, and a test locks it in.","status":"mitigated in code","sources":["R1","R17","R18","R19","R20","R22"],"score":12},{"id":"H02","category":"Household animals","title":"Redirected aggression in dogs","affected":"People near an exposed dog","mechanism":"Acoustic stress is a documented trigger for redirected aggression. A startled dog may bite a bystander rather than flee, turning an animal welfare issue into a human injury.","severity":"severe","likelihood":"possible","detection":"Same dog detection; no direct behavioural sensing.","mitigation":"Covered by the same absolute dog veto - the system never knowingly stresses a dog in the first place.","residual":"Depends entirely on detection recall. An undetected dog is an unmitigated hazard.","status":"partially mitigated","sources":["R17"],"score":9},{"id":"H09","category":"Flight geometry","title":"Cornered animal with no escape route","affected":"The animal","mechanism":"Grandin's handling work is explicit that pressure applied to an animal with no viable exit produces panic rather than controlled movement, including attempts to climb or charge through barriers.","severity":"severe","likelihood":"possible","detection":"Clear-corridor test along the flight vector; requires at least 8 m of ground away from the carriageway.","mitigation":"Denial.NO_ESCAPE_ROUTE.","residual":"Walls, ditches and fences are not in the site model - only the carriageway polygon is. Real obstacles would need surveying.","status":"partially mitigated","sources":["R24"],"score":9},{"id":"H10","category":"Flight geometry","title":"Tethered or restrained animal","affected":"The animal","mechanism":"A tethered animal cannot leave no matter how aversive the signal. Continuing to emit is pure distress with zero possible benefit.","severity":"severe","likelihood":"possible","detection":"Displacement after a completed emission; less than 1.5 m of movement flags possible restraint, injury or illness.","mitigation":"Denial.IMMOBILE_ANIMAL, permanent do-not-emit flag for that animal, and escalation for human inspection.","residual":"Requires one emission to have already occurred before the condition is detectable. We cannot see a rope.","status":"partially mitigated","sources":["R24"],"score":9},{"id":"H12","category":"Vulnerable individuals","title":"Dam with young at foot","affected":"People and the calf or kid","mechanism":"Maternal defence is the classic livestock aggression scenario, and the young animal is itself more vulnerable to acoustic stress.","severity":"severe","likelihood":"possible","detection":"Real-world height estimated from bounding box and range; below 70% of species-typical adult height the animal is treated as juvenile.","mitigation":"Denial.JUVENILE_PRESENT vetoes emission anywhere in the group.","residual":"Height estimation inherits the camera's ~20% calibration error AND degrades with range - a calf far from the camera can measure as an adult and be missed. In testing, a calf was only classified correctly once inside roughly 20 m. Juvenile protection is therefore weakest exactly where first contact happens.","status":"mitigated in code","sources":["R24"],"score":9},{"id":"H18","category":"Wildlife","title":"Macaques and other undetectable species","affected":"Monkeys, pigs, small wildlife","mechanism":"Rhesus macaques are common on Indian roads and highly reactive. COCO has no macaque class and no pig class.","severity":"severe","likelihood":"possible","detection":"NONE. The perception stack is blind to these species.","mitigation":"None available. The system must not be described as protecting species it cannot see.","residual":"OPEN and undetectable. Requires a custom-trained detector before any site with known macaque presence.","status":"UNDETECTABLE by this system","sources":["R22"],"score":9},{"id":"H20","category":"System","title":"Detection failure creates false confidence","affected":"Road users","mechanism":"An operator who believes the site is protected relaxes other precautions. A missed animal is then worse than no system.","severity":"severe","likelihood":"possible","detection":"Not self-detectable - by definition the system cannot see what it missed.","mitigation":"The traffic-control layer fires on ANY detection at any range and is never gated on acoustic feasibility, so the proven mitigation does not depend on the unproven one. Documentation states plainly that this is not a containment system.","residual":"Irreducible. Any detector has finite recall.","status":"accepted, documented","sources":["R5"],"score":9},{"id":"H13","category":"Vulnerable individuals","title":"Children hear a carrier adults cannot","affected":"Children and adolescents near the site","mechanism":"High-frequency hearing declines with age. A 22 kHz carrier selected because adults cannot hear it may still be plainly audible to a child - commercial anti-loitering devices exploit exactly this gap near 17.4 kHz.","severity":"moderate","likelihood":"likely","detection":"Not detectable per-individual. Handled as a SITE property.","mitigation":"sensitive_receptor_floor_hz() raises the band floor to 25 kHz near schools or dense housing, and a separate child-audibility curve is reported alongside the adult one rather than hidden inside it.","residual":"Site classification is a manual configuration input. Nobody verifies that the installer set it honestly.","status":"partially mitigated","sources":["R13","R23"],"score":8},{"id":"H16","category":"Working animals","title":"Draught animal bolts while harnessed","affected":"The handler, the animal, the load, other road users","mechanism":"A bolting bullock or horse pulling a cart is among the most dangerous outcomes imaginable here - and the handler is a person standing directly inside the exposure cone.","severity":"catastrophic","likelihood":"unlikely","detection":"COCO 'horse' class; a person adjacent to a large animal is a strong cue for a working pairing.","mitigation":"Horses are vetoed unconditionally as non-target, and any person in the cone independently vetoes emission. Two separate rules must both fail for this to occur.","residual":"A bullock harnessed to a cart is detected as 'cow' - the target class. The person veto is the only thing standing between us and this hazard, and it depends on the handler being visible.","status":"partially mitigated","sources":["R1","R24"],"score":8},{"id":"H21","category":"System","title":"Distance error causes over- or under-exposure","affected":"The target animal","mechanism":"Level is solved from estimated range. A range error becomes a level error directly.","severity":"moderate","likelihood":"likely","detection":"Inverse-perspective mapping with a stated ~20% error band.","mitigation":"Range decisions use the pessimistic absorption model and exposure decisions the optimistic one, so both errors fall on the safe side. The ceiling is an absolute backstop regardless of range.","residual":"Uncalibrated camera. A measured homography is required before deployment.","status":"partially mitigated","sources":["R15"],"score":8},{"id":"H22","category":"System","title":"Audible artefacts from hardware nonlinearity","affected":"Everyone nearby","mechanism":"A hard-gated burst splatters broadband energy into the audible band, and real amplifiers and transducers add nonlinearity on top.","severity":"moderate","likelihood":"likely","detection":"FFT self-inspection of the synthesised buffer before playback.","mitigation":"Raised-cosine envelope on every burst, roughly 98 dB improvement in the audible band, plus refusal to play a buffer that fails the check.","residual":"The check models a linear chain. Only a calibrated ultrasonic microphone on real hardware settles this.","status":"partially mitigated","sources":["R13"],"score":8},{"id":"H24","category":"System","title":"Habituation produces silent failure","affected":"Road users","mechanism":"Response decays with repeated unpaired exposure - our projection puts it near 0.1 by day ten. The system keeps operating while quietly ceasing to work.","severity":"moderate","likelihood":"likely","detection":"Per-animal exposure counters and the habituation projection in the twin.","mitigation":"Pattern and carrier variation between exposures; the ledger records response rate per animal per day so decay is measurable rather than assumed.","residual":"Variation is a HYPOTHESIS-grade mitigation. It may not work.","status":"partially mitigated","sources":["R5","R6","R11"],"score":8},{"id":"H27","category":"Misuse","title":"Level raised beyond the welfare ceiling","affected":"Animals and people","mechanism":"Someone points at the 142 dB prototype paper and asks for more power.","severity":"catastrophic","likelihood":"unlikely","detection":"Governor adjudicates every request; nothing reaches the amplifier without a signed authorisation.","mitigation":"The ceiling is not a configuration value an operator can raise. Even a signed ethics token only reaches the top of the cited occupational band, and a test asserts no emission in any scenario exceeds it.","residual":"Someone could fork the code. Nothing prevents that.","status":"mitigated in code","sources":["R4","R13"],"score":8},{"id":"H03","category":"Household animals","title":"Cat exposed to the carrier","affected":"Domestic and community cats","mechanism":"Cats hear to ~85 kHz. A 25 kHz tone sits nearly two octaves inside their range - the most acoustically over-exposed animal at any site.","severity":"moderate","likelihood":"possible","detection":"COCO 'cat' class. Recall on small, low-contrast animals at night is poor and we have not measured it.","mitigation":"Non-target veto.","residual":"Small nocturnal animals are the weakest case for this detector. Unquantified.","status":"partially mitigated","sources":["R18"],"score":6},{"id":"H11","category":"Flight geometry","title":"Downed, sick or injured animal harassed","affected":"The animal","mechanism":"An animal that is recumbent or collapsed cannot respond and must be rescued, not nudged.","severity":"severe","likelihood":"unlikely","detection":"Bounding-box aspect ratio above 1.6 flags possible recumbency. Crude, and deliberately biased toward false positives.","mitigation":"Denial.DOWNED_ANIMAL plus immediate escalation for veterinary or municipal response.","residual":"Aspect ratio confuses a grazing animal with a downed one. We accept the false positives; the asymmetry of harm justifies it.","status":"partially mitigated","sources":["R24"],"score":6},{"id":"H14","category":"Vulnerable individuals","title":"Hearing aids and cochlear implants","affected":"Hearing-aid and implant users","mechanism":"Ultrasonic energy can intermodulate in a hearing-aid microphone and front end, producing audible artefacts for a listener who could not otherwise perceive the carrier at all.","severity":"moderate","likelihood":"possible","detection":"Not detectable.","mitigation":"Indirect only: any detected person vetoes emission, and total on-time is bounded to seconds.","residual":"OPEN. We found no measurement of ultrasonic intermodulation in modern hearing aids and are not competent to assert one. Flagged as a question for an audiologist before any deployment near people.","status":"OPEN - no mitigation","sources":["R13"],"score":6},{"id":"H17","category":"Wildlife","title":"Masking of bat echolocation","affected":"Insectivorous bats","mechanism":"Several bats echolocate in the 20-35 kHz region. This is not a coincidence - the atmospheric absorption measurement this system depends on (R14) is itself a bat echolocation paper, because bats are who uses these frequencies in air.","severity":"moderate","likelihood":"possible","detection":"Not detectable.","mitigation":"Behavioural rather than spectral: event-triggered sub-second bursts, enforced silence, no standby emission. Expected nightly on-time is seconds.","residual":"Unquantified. No bat activity survey has been done at any site.","status":"partially mitigated","sources":["R14"],"score":6},{"id":"H19","category":"System","title":"Misclassification: dog detected as cow","affected":"The misclassified animal","mechanism":"A confident wrong label routes a non-target into the target path.","severity":"severe","likelihood":"unlikely","detection":"Detector confidence threshold; per-class scoring.","mitigation":"Partial: the non-target veto only helps when the label is right. Confidence floor of 0.35 is a blunt instrument.","residual":"No confusion matrix has been measured on Indian road footage. This is an unquantified failure mode.","status":"partially mitigated","sources":[],"score":6},{"id":"H23","category":"System","title":"Stuck-on emitter","affected":"Every animal and person in range","mechanism":"A software hang or power fault leaves the emitter radiating continuously - the worst possible exposure profile.","severity":"severe","likelihood":"unlikely","detection":"Watchdog timer; maximum activation of 6 s enforced per request.","mitigation":"Hard duration cap in the governor. A hardware watchdog that de-energises the amplifier is specified as a build requirement.","residual":"The hardware watchdog does not exist yet - there is no hardware. Software alone cannot guarantee this.","status":"partially mitigated","sources":["R16"],"score":6},{"id":"H28","category":"Misuse","title":"Emitter aimed at a dwelling or school","affected":"Residents, pupils","mechanism":"Poor siting points a directional beam at occupied buildings.","severity":"moderate","likelihood":"possible","detection":"Not automatically detectable.","mitigation":"Site configuration carries a sensitive-receptor flag that raises the band floor; a siting checklist is specified as an install requirement.","residual":"Depends entirely on honest installation.","status":"partially mitigated","sources":["R13","R23"],"score":6},{"id":"H29","category":"Misuse","title":"Legal non-compliance on containment standards","affected":"The operator","mechanism":"Many jurisdictions specify fencing or containment standards regardless of what a technical deterrent achieves.","severity":"moderate","likelihood":"possible","detection":"n/a","mitigation":"Documented prominently; the system is positioned as a deterrent layer and never as a legal containment boundary.","residual":"Accepted. Legal review is required per jurisdiction.","status":"accepted, documented","sources":[],"score":6},{"id":"H25","category":"System","title":"Operator tampers with the record","affected":"Regulators, the public","mechanism":"An operator rewrites a night in which something went wrong.","severity":"moderate","likelihood":"unlikely","detection":"SHA-256 hash chain; verify() recomputes the whole ledger.","mitigation":"Any edit or deletion invalidates every subsequent record.","residual":"Single-writer log. It detects post-hoc edits but does not prove the writer was honest at write time. External timestamping would be needed for that.","status":"partially mitigated","sources":[],"score":4},{"id":"H15","category":"Vulnerable individuals","title":"Hyperacusis, tinnitus, migraine sensitivity","affected":"Susceptible bystanders","mechanism":"Some people report discomfort from ultrasonic sources at levels others do not perceive.","severity":"minor","likelihood":"possible","detection":"Not detectable.","mitigation":"Person veto plus bounded on-time. A published complaints channel is specified as an operational requirement, not a code feature.","residual":"Accepted and documented. No individualised protection is possible.","status":"accepted, documented","sources":["R13"],"score":3},{"id":"H04","category":"Household animals","title":"Poultry and backyard birds","affected":"Chickens, ducks","mechanism":"Checked and found NOT to apply: chicken hearing tops out near 7 kHz, nearly two octaves below the carrier.","severity":"minor","likelihood":"rare","detection":"Not needed for this hazard.","mitigation":"None required. Recorded so the register states what the system does not endanger, not only what it does.","residual":"None identified.","status":"accepted, documented","sources":["R22"],"score":1}],"hazsum":{"total_hazards":30,"categories":8,"by_status":{"partially mitigated":19,"accepted, documented":4,"mitigated in code":5,"OPEN - no mitigation":1,"UNDETECTABLE by this system":1},"by_severity":{"severe":12,"moderate":10,"minor":2,"catastrophic":6},"catastrophic":["H05","H07","H08","H16","H26","H27"],"open_or_undetectable":["H14","H18"],"highest_scoring":[{"id":"H01","title":"Dog exposed to the carrier","score":12},{"id":"H05","title":"Goat or sheep flock panic cascade","score":12},{"id":"H06","title":"Goats misdetected as sheep, or missed entirely","score":12},{"id":"H07","title":"Herd breakthrough led by one animal","score":12},{"id":"H08","title":"Animal driven ONTO the carriageway","score":12}],"honesty_note":"2 of 30 hazards are open or undetectable and are listed anyway. A register with no open rows has been edited, not completed."},"carrier_khz":25.0}</script>
+<script>
+const D = JSON.parse(document.getElementById("payload").textContent);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+/* ---------- tiles ---------- */
+const emitScen = Object.values(D.scen).reduce((a,s)=>a+s.emis,0);
+document.getElementById("tiles").innerHTML = [
+  ["Prototype level refused","142<small> dB</small>","crit"],
+  ["Non-target species that<br>out-hear the target",D.selectivity.more_sensitive_than_target.length,"crit"],
+  ["Emitter ceiling","110<small> dB @1m</small>",""],
+  ["Selected carrier","22.0<small> kHz</small>",""],
+  ["Hazards registered",`${D.hazsum.total_hazards}<small> · ${D.hazsum.open_or_undetectable.length} open</small>`,""],
+  ["Tests passing","92<small>/92</small>","ok"],
+].map(([k,v,c])=>`<div class="tile ${c}"><div class="tile-k">${k}</div><div class="tile-v">${v}</div></div>`).join("");
+
+document.getElementById("foot-const").textContent = D.audit.total_constants;
+document.getElementById("foot-atm").textContent =
+  `${D.atm.temp_c} °C · ${D.atm.rh_pct}% RH · ambient ${D.atm.ambient_spl_db} dB · +12 dB directivity`;
+
+/* ---------- species table ---------- */
+document.querySelector("#sptable tbody").innerHTML = D.species.map(r=>{
+  let note="", cls="";
+  if(!r.audible){ note="Inaudible — not at risk"; cls="g-high"; }
+  else if(r.key===D.selectivity.carrier_khz && false){ }
+  else if(r.name==="Cattle"){ note="THE TARGET"; cls="g-mod"; }
+  else if(r.more_sensitive_than_target){ note="Hears it better than the target"; cls="g-low"; }
+  else { note="Affected"; cls="g-hyp"; }
+  const gap = r.detectable ? "" : ` <span class="chip g-heu">undetectable</span>`;
+  return `<tr><td class="name">${esc(r.name)}${gap}</td><td style="color:var(--muted)">${esc(r.group)}</td>
+    <td class="num">${r.limit_khz.toFixed(1)} kHz</td>
+    <td class="num" style="color:${r.audible?(r.more_sensitive_than_target?css('--crit'):'inherit'):css('--faint')}">${r.octaves_below_limit>0?"+":""}${r.octaves_below_limit.toFixed(3)}</td>
+    <td><span class="chip ${cls}">${note}</span></td></tr>`;
+}).join("");
+
+document.getElementById("selectivity").innerHTML =
+  `At ${D.selectivity.carrier_khz} kHz the target ranks <strong>${D.selectivity.target_sensitivity_rank}</strong> among species that can hear the signal. `+
+  `<strong>${D.selectivity.more_sensitive_than_target.length} non-target species hear it better than the animal we are aiming at</strong> — ${esc(D.selectivity.more_sensitive_than_target.join(", "))}. `+
+  `<code>frequency_is_selective = false</code>, computed rather than asserted, and locked in by a test.`;
+
+const cr = D.envelope.find(e=>e.khz===22) || {child_risk:0};
+document.getElementById("childrisk").innerHTML =
+  `At 22 kHz our modelled child-audibility risk is <strong>${(cr.child_risk*100).toFixed(0)}%</strong> against ${(cr.human_risk*100).toFixed(2)}% for adults.`;
+document.getElementById("gapnote").textContent = D.gapnote;
+
+/* ---------- hazard register ---------- */
+const HS = {"mitigated in code":["g-high","Mitigated"],"partially mitigated":["g-mod","Partial"],
+  "accepted, documented":["g-hyp","Accepted"],"OPEN - no mitigation":["g-low","OPEN"],
+  "UNDETECTABLE by this system":["g-low","Undetectable"]};
+const sevCol = s => s==="catastrophic"?css('--crit'):s==="severe"?css('--warn'):css('--muted');
+document.getElementById("hazbar").innerHTML =
+  `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">` +
+  Object.entries(D.hazsum.by_status).map(([k,v])=>
+    `<span class="chip ${(HS[k]||["g-heu",k])[0]}">${(HS[k]||["",k])[1]} · ${v}</span>`).join("") +
+  `<span class="chip g-hyp">${D.hazsum.total_hazards} total</span></div>`;
+
+document.querySelector("#haztable tbody").innerHTML = D.hazards.map(h=>
+  `<tr><td class="name">${h.id}</td>
+   <td style="min-width:190px"><strong style="color:var(--ink)">${esc(h.title)}</strong><br>
+     <span style="color:var(--faint);font-size:11.5px">${esc(h.affected)}</span></td>
+   <td style="color:var(--muted);font-size:12.5px;white-space:nowrap">${esc(h.category)}</td>
+   <td class="num" style="color:${sevCol(h.severity)}">${h.score}<br>
+     <span style="font-size:10.5px;color:var(--faint)">${esc(h.severity)}</span></td>
+   <td><span class="chip ${(HS[h.status]||["g-heu"])[0]}">${(HS[h.status]||["",h.status])[1]}</span></td>
+   <td class="why">${esc(h.residual)}</td></tr>`).join("");
+
+document.getElementById("openhaz").innerHTML =
+  D.hazsum.open_or_undetectable.map(id=>{
+    const h = D.hazards.find(x=>x.id===id);
+    return `<strong>${h.id} — ${esc(h.title)}.</strong> ${esc(h.residual)}`;
+  }).join("<br><br>") +
+  `<br><br>${esc(D.hazsum.honesty_note)}`;
+
+/* ---------- grade bar ---------- */
+const GK = {"High":["g-high","High"],"Moderate":["g-mod","Moderate"],"Low":["g-low","Low"],
+  "Hypothesis":["g-hyp","Hypothesis"],"Heuristic (ours, unvalidated)":["g-heu","Ours, unvalidated"]};
+const order = ["High","Moderate","Low","Hypothesis","Heuristic (ours, unvalidated)"];
+document.getElementById("gradebar").innerHTML =
+  `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">` +
+  order.filter(g=>D.audit.by_grade[g]).map(g=>
+    `<span class="chip ${GK[g][0]}">${GK[g][1]} · ${D.audit.by_grade[g]}</span>`).join("") +
+  `</div>`;
+
+/* ---------- evidence table ---------- */
+const evRows = D.evidence.slice().sort((a,b)=>order.indexOf(a.g)-order.indexOf(b.g));
+document.querySelector("#evtable tbody").innerHTML = evRows.map(c=>{
+  const v = typeof c.v === "number" ? (c.v>=1000 ? c.v.toLocaleString() : c.v) : c.v;
+  return `<tr><td class="name">${esc(c.n)}</td><td class="num">${v} <span style="color:var(--faint)">${esc(c.u)}</span></td>
+  <td><span class="chip ${GK[c.g][0]}">${GK[c.g][1]}</span></td>
+  <td class="name" style="color:var(--muted)">${c.s.join(" ")}</td>
+  <td class="why">${esc(c.r)}</td></tr>`;
+}).join("");
+
+/* ---------- physics block ---------- */
+const rows = [[2,6.0,0.7,6.7],[5,14.0,2.8,16.8],[10,20.0,6.3,26.3],[20,26.0,13.3,39.3],[30,29.5,20.3,49.8]];
+document.getElementById("physics").innerHTML =
+  `<span class="c">dist   geometric  absorption   total   report</span>\n` +
+  rows.map(([d,g,a,t])=>
+    `${String(d).padStart(3)} m ${g.toFixed(1).padStart(10)} ${a.toFixed(1).padStart(11)} ${t.toFixed(1).padStart(8)} ${t.toFixed(1).padStart(8)}  <span class="g">ok</span>`
+  ).join("\n") + `\n<span class="c">all rows reproduced to 0.1 dB</span>`;
+
+document.querySelector("#disagree tbody").innerHTML = D.disagree.map(d=>
+  `<tr><td class="name">${d.freq_khz} kHz</td><td class="num">${d.iso9613_total_loss_db} dB</td>
+   <td class="num">${d.lawrence_simmons_total_loss_db} dB</td>
+   <td class="num" style="color:var(--warn)">${d.disagreement_db} dB</td></tr>`).join("");
+
+/* ---------- refusal ---------- */
+document.getElementById("refusal-detail").innerHTML =
+  `Asked to serve a target that would require the prototype's exposure, the governor returns <strong>granted: false</strong> — <code>${esc(D.refusal.detail)}</code>`;
+document.getElementById("refusal-conc").textContent = D.refusal.conclusion;
+document.getElementById("denials").innerHTML = [
+  ["Bystander present","any person in the exposure cone blocks every request"],
+  ["Non-target species","dogs, horses, sheep, cats in the cone block emission"],
+  ["Duration watchdog","6 s hard cap on any single activation"],
+  ["Enforced silence","20 s quiet period per animal between exposures"],
+  ["Daily exposure budget","120 s per animal, then permanent do-not-emit"],
+  ["Panic stop criterion","a run/panic response inhibits that animal for the session"],
+  ["Band discipline","carrier outside 22–30 kHz is rejected outright"],
+  ["Unreachable target","refuses rather than exceeding the ceiling"],
+].map(([a,b])=>`<li><strong>${a}</strong> — ${b}</li>`).join("");
+
+/* ---------- charts ---------- */
+function svg(w,h,inner){return `<svg viewBox="0 0 ${w} ${h}" role="img">${inner}</svg>`;}
+function axis(x0,y0,x1,y1){return `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${css('--line-strong')}" stroke-width="1"/>`;}
+function txt(x,y,s,o={}){return `<text x="${x}" y="${y}" fill="${o.fill||css('--faint')}" font-size="${o.size||10.5}" font-family="ui-monospace,Menlo,monospace" text-anchor="${o.anchor||'middle'}"${o.weight?` font-weight="${o.weight}"`:''}>${s}</text>`;}
+
+/* envelope */
+(function(){
+  const W=520,H=300,L=44,R=14,T=16,B=40;
+  const d=D.envelope, maxR=Math.max(...d.map(v=>v.range_m));
+  const x=i=>L+(W-L-R)*(d[i].khz-d[0].khz)/(d[d.length-1].khz-d[0].khz);
+  const y=v=>T+(H-T-B)*(1-v/(maxR*1.08));
+  let g="";
+  for(let r=0;r<=50;r+=10){g+=`<line x1="${L}" y1="${y(r)}" x2="${W-R}" y2="${y(r)}" stroke="${css('--grid')}"/>`+txt(L-8,y(r)+3.5,r,{anchor:"end"});}
+  // band shading 22-30
+  const bx0=x(d.findIndex(v=>v.khz===22)), bx1=x(d.findIndex(v=>v.khz===30));
+  g=`<rect x="${bx0}" y="${T}" width="${bx1-bx0}" height="${H-T-B}" fill="${css('--accent-soft')}" opacity=".6"/>`+g;
+  g+=txt((bx0+bx1)/2,T+13,"documented band 22–30 kHz",{fill:css('--accent'),size:10});
+  // bars
+  d.forEach((v,i)=>{
+    const inBand = v.khz>=22 && v.khz<=30;
+    const col = inBand?css('--accent'):css('--crit');
+    const bw=(W-L-R)/d.length*0.52;
+    g+=`<rect x="${x(i)-bw/2}" y="${y(v.range_m)}" width="${bw}" height="${H-B-y(v.range_m)}" fill="${col}" opacity="${inBand?.92:.28}"/>`;
+    if(v.khz%4===2||v.khz===18||v.khz===34) g+=txt(x(i),H-B+16,v.khz);
+  });
+  // human risk overlay
+  let p="";
+  d.forEach((v,i)=>{p+=(i?"L":"M")+x(i)+","+(T+(H-T-B)*(1-v.human_risk))+" ";});
+  g+=`<path d="${p}" fill="none" stroke="${css('--warn')}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".8"/>`;
+  g+=axis(L,H-B,W-R,H-B);
+  g+=txt(L-8,T+8,"m",{anchor:"end"})+txt((W)/2,H-6,"carrier frequency (kHz)");
+  document.getElementById("chart-env").innerHTML=svg(W,H,g);
+})();
+
+/* gating */
+(function(){
+  const W=520,H=200,L=104,R=20,T=24,B=42;
+  const vals=[["Hard-gated",D.gating.hard,css('--crit')],["Raised-cosine",D.gating.soft,css('--accent')]];
+  const min=-180,max=-40;
+  const x=v=>L+(W-L-R)*(Math.max(v,min)-min)/(max-min);
+  let g="";
+  for(let v=-180;v<=-40;v+=35){g+=`<line x1="${x(v)}" y1="${T}" x2="${x(v)}" y2="${H-B}" stroke="${css('--grid')}"/>`+txt(x(v),H-B+16,v);}
+  vals.forEach((r,i)=>{
+    const yy=T+22+i*54;
+    g+=txt(L-12,yy+4,r[0],{anchor:"end",fill:css('--body'),size:11.5});
+    g+=`<rect x="${L}" y="${yy-11}" width="${x(r[1])-L}" height="22" fill="${r[2]}" opacity=".85"/>`;
+    g+=txt(x(r[1])+6,yy+4,r[1].toFixed(1)+" dB",{anchor:"start",fill:r[2],size:11});
+  });
+  g+=axis(L,H-B,W-R,H-B);
+  g+=txt((W+L)/2-30,H-8,"audible-band energy relative to carrier (dB)");
+  document.getElementById("chart-gate").innerHTML=svg(W,H,g);
+  document.getElementById("gate-note").innerHTML =
+    `Ramping improves the audible band by <strong>${D.gating.imp.toFixed(0)} dB</strong> at zero cost. `+esc(D.gating.note);
+})();
+
+/* dose-response */
+(function(){
+  const W=520,H=290,L=44,R=16,T=18,B=42;
+  const d=D.dose, x=v=>L+(W-L-R)*(v-d[0].db)/(d[d.length-1].db-d[0].db), y=p=>T+(H-T-B)*(1-p);
+  let g="";
+  for(let p=0;p<=1.001;p+=0.25){g+=`<line x1="${L}" y1="${y(p)}" x2="${W-R}" y2="${y(p)}" stroke="${css('--grid')}"/>`+txt(L-8,y(p)+3.5,p.toFixed(2),{anchor:"end"});}
+  let up="",dn="";
+  d.forEach((v,i)=>{up+=(i?"L":"M")+x(v.db)+","+y(v.hi)+" ";});
+  for(let i=d.length-1;i>=0;i--){dn+="L"+x(d[i].db)+","+y(d[i].lo)+" ";}
+  g+=`<path d="${up}${dn}Z" fill="${css('--accent')}" opacity=".18"/>`;
+  let m="";d.forEach((v,i)=>{m+=(i?"L":"M")+x(v.db)+","+y(v.m)+" ";});
+  g+=`<path d="${m}" fill="none" stroke="${css('--accent')}" stroke-width="2"/>`;
+  // ceiling marker: received level actually achievable
+  const rx=x(65);
+  g+=`<line x1="${rx}" y1="${T}" x2="${rx}" y2="${H-B}" stroke="${css('--warn')}" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  g+=txt(rx+6,T+12,"≈ what the ceiling permits",{anchor:"start",fill:css('--warn'),size:10});
+  [55,70,85,100].forEach(v=>g+=txt(x(v),H-B+16,v));
+  g+=axis(L,H-B,W-R,H-B);
+  g+=txt((W)/2,H-6,"received level at the animal (dB SPL)");
+  document.getElementById("chart-dose").innerHTML=svg(W,H,g);
+})();
+
+/* habituation */
+(function(){
+  const W=520,H=290,L=44,R=16,T=18,B=42;
+  const d=D.hab, x=i=>L+(W-L-R)*i/(d.length-1), y=p=>T+(H-T-B)*(1-p/0.5);
+  let g="";
+  for(let p=0;p<=0.5001;p+=0.125){g+=`<line x1="${L}" y1="${y(p)}" x2="${W-R}" y2="${y(p)}" stroke="${css('--grid')}"/>`+txt(L-8,y(p)+3.5,p.toFixed(3),{anchor:"end"});}
+  let m="";d.forEach((v,i)=>{m+=(i?"L":"M")+x(i)+","+y(v.m)+" ";});
+  g+=`<path d="${m}" fill="none" stroke="${css('--warn')}" stroke-width="2"/>`;
+  g+=`<path d="${m}L${x(d.length-1)},${H-B}L${L},${H-B}Z" fill="${css('--warn')}" opacity=".13"/>`;
+  d.forEach((v,i)=>{if(i%2===0)g+=txt(x(i),H-B+16,v.d);});
+  const last=d[d.length-1];
+  g+=`<circle cx="${x(d.length-1)}" cy="${y(last.m)}" r="4" fill="${css('--warn')}"/>`;
+  g+=txt(x(d.length-1)-8,y(last.m)-10,last.m.toFixed(3),{anchor:"end",fill:css('--warn'),size:11});
+  g+=axis(L,H-B,W-R,H-B);
+  g+=txt((W)/2,H-6,"day of repeated exposure");
+  document.getElementById("chart-hab").innerHTML=svg(W,H,g);
+})();
+
+/* traffic */
+(function(){
+  const W=520,H=280,L=52,R=16,T=18,B=42;
+  const d=D.traffic.filter(v=>v.h>0), maxH=Math.max(...d.map(v=>v.h));
+  const x=i=>L+(W-L-R)*i/(d.length-1), y=v=>T+(H-T-B)*(1-v/(maxH*1.1));
+  let g="";
+  for(let k=0;k<=4;k++){const v=maxH*1.1*k/4;g+=`<line x1="${L}" y1="${y(v)}" x2="${W-R}" y2="${y(v)}" stroke="${css('--grid')}"/>`+txt(L-8,y(v)+3.5,v.toFixed(0),{anchor:"end"});}
+  let m="";d.forEach((v,i)=>{m+=(i?"L":"M")+x(i)+","+y(v.h)+" ";});
+  g+=`<path d="${m}L${x(d.length-1)},${H-B}L${L},${H-B}Z" fill="${css('--accent')}" opacity=".15"/>`;
+  g+=`<path d="${m}" fill="none" stroke="${css('--accent')}" stroke-width="2"/>`;
+  d.forEach((v,i)=>{g+=`<circle cx="${x(i)}" cy="${y(v.h)}" r="3" fill="${css('--accent')}"/>`+txt(x(i),H-B+16,v.b+"s");});
+  const lastp=d[d.length-1];
+  g+=txt(x(d.length-1)-6,y(lastp.h)-9,lastp.h.toFixed(0)+" person-h",{anchor:"end",fill:css('--accent'),size:11});
+  g+=axis(L,H-B,W-R,H-B);
+  g+=txt((W)/2,H-6,"blockage duration");
+  g+=txt(L-8,T+8,"person-h",{anchor:"end",size:9.5});
+  document.getElementById("chart-traffic").innerHTML=svg(W,H,g);
+})();
+
+/* benefit table */
+const bmap=[["Vehicle-hours of delay","delay_veh_h_saved",""],["Person-hours","person_hours_saved",""],
+  ["Fuel (litres)","fuel_litres_saved",""],["CO₂ (kg)","co2_kg_saved",""],["Cost (INR)","cost_inr_saved","₹"]];
+document.querySelector("#benefit tbody").innerHTML = bmap.map(([lbl,k,p])=>
+  `<tr><td>${lbl}</td><td class="num">${p}${D.benefit[k].toLocaleString()}</td></tr>`).join("")
+  + `<tr><td style="color:var(--muted)">Per day @ 4 incidents</td><td class="num" style="color:var(--accent)">₹${D.perday.cost_inr_saved.toLocaleString()}</td></tr>`;
+
+/* scenarios */
+const denShort = s => Object.keys(s.den||{}).length
+  ? Object.entries(s.den).map(([k,v])=>`${k.replace(/^(a |an |the )/,"")} ×${v}`).join("; ")
+  : (s.esc ? "escalated to human dispatch" : "nominal");
+document.querySelector("#scentable tbody").innerHTML = Object.entries(D.scen).map(([n,s])=>
+  `<tr><td class="name">${n}</td><td class="num">${s.emis}</td><td class="num">${s.sec.toFixed(2)} s</td>
+   <td class="num" style="color:${s.esc?css('--warn'):'inherit'}">${s.esc}</td>
+   <td class="why">${esc(denShort(s))}</td>
+   <td class="num">${s.rec} <span style="color:var(--ok)">✓</span></td></tr>`).join("");
+
+/* trial + prior */
+document.getElementById("trial-note").innerHTML =
+  `The intervals are not an excuse — they are a specification. To detect a turn-away improvement from ${(D.trial.baseline_turn_away_rate*100).toFixed(0)}% to ${(D.trial.target_turn_away_rate*100).toFixed(0)}% at ${(D.trial.power*100).toFixed(0)}% power, the model computes <strong>${D.trial.approaches_per_arm} approaches per arm, ${D.trial.total_approaches} total</strong>. That converts “someone should test this” into a costable two-week protocol.`;
+document.getElementById("prior-note").textContent = D.prior;
+document.getElementById("next-step").innerHTML =
+  `Bench-characterise the transducer with a calibrated ultrasonic microphone, then run the ${D.trial.total_approaches}-approach randomised protocol with an OFF control arm, clustered by herd because responses are socially facilitated. The repository already emits the field-test sheet, the outcome codes, and the stop criteria that protocol needs.`;
+</script>

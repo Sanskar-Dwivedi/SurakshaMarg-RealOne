@@ -148,8 +148,14 @@ const uint8_t  MAX_ATTEMPTS      = 3;
  * by this and the true values are printed at boot - the compression is stated,
  * not hidden. Set to 4, not 10: at 10x, escalation fires 2.5 s after detection,
  * which is quicker than you can reach for a button, so every veto you try to
- * demonstrate has already gone to amber. Verified in the simulator. */
-const uint16_t DEMO_SPEED        = 4;
+ * demonstrate has already gone to amber. Verified in the simulator.
+ *
+ * Lowered from 4 to 2 after watching someone use it. Compression shortens the
+ * permitted burst as much as the waiting, and the burst is the only part that
+ * is visible - at 4x it lasted 1.5 s and the rig looked like it only ever
+ * refused. At 2x it is three seconds, which reads. The waits grow too, but
+ * nobody is watching those. */
+const uint16_t DEMO_SPEED        = 2;
 
 const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
 const float RANGE_MAX_M = 42.8;

@@ -225,7 +225,7 @@ enforces the firmware's rules rather than an approximation of them.</p>
     <h2>Governor</h2>
     <table><tbody>
       <tr><td class="k">Attempts this incident</td><td class="v" id="mAtt">0 / 3</td></tr>
-      <tr><td class="k">Exposure budget used</td><td class="v" id="mBud">0.0 / 30 s</td></tr>
+      <tr><td class="k">Exposure budget used</td><td class="v" id="mBud">0.0 / 60 s</td></tr>
       <tr><td class="k">Quiet period remaining</td><td class="v" id="mQuiet">--</td></tr>
       <tr><td class="k">Time to escalation</td><td class="v" id="mEsc">--</td></tr>
     </tbody></table>
@@ -243,19 +243,19 @@ could drive on the bench, and it would refuse for the same reasons.</p>
 <p><b>What it still does not claim.</b> No sound is produced and no decibel
 figure is shown, because there is no calibrated microphone anywhere in this
 project. The emitter bar is drive duty, not acoustic output. Timers run
-4x faster than the shipped values so a full cycle fits in a demo; both
+2x faster than the shipped values so a full cycle fits in a demo; both
 figures are in the table below.</p>
 </div>
 
 <div class="card" style="margin-top:16px">
 <h2>Limits in force</h2>
-<table><tbody><tr><td class="k">Carrier</td><td class="v">25.0 kHz</td></tr><tr><td class="k">Envelope ramp</td><td class="v">25 ms raised cosine</td></tr><tr><td class="k">Max single activation</td><td class="v">6 s  &rarr; demo 1.5 s</td></tr><tr><td class="k">Enforced quiet period</td><td class="v">20 s  &rarr; demo 5.0 s</td></tr><tr><td class="k">Daily exposure budget</td><td class="v">120 s  &rarr; demo 30 s</td></tr><tr><td class="k">Escalate after</td><td class="v">25 s  &rarr; demo 6.2 s</td></tr><tr><td class="k">Max group size</td><td class="v">3 animals</td></tr><tr><td class="k">Max attempts</td><td class="v">3</td></tr><tr><td class="k">Bench scale</td><td class="v">2.8 cm per field metre</td></tr><tr><td class="k">Carriageway line</td><td class="v">12 m  (34 cm on the bench)</td></tr><tr><td class="k">Acoustic envelope</td><td class="v">42.8 m  (120 cm)</td></tr></tbody></table>
+<table><tbody><tr><td class="k">Carrier</td><td class="v">25.0 kHz</td></tr><tr><td class="k">Envelope ramp</td><td class="v">25 ms raised cosine</td></tr><tr><td class="k">Max single activation</td><td class="v">6 s  &rarr; demo 3.0 s</td></tr><tr><td class="k">Enforced quiet period</td><td class="v">20 s  &rarr; demo 10.0 s</td></tr><tr><td class="k">Daily exposure budget</td><td class="v">120 s  &rarr; demo 60 s</td></tr><tr><td class="k">Escalate after</td><td class="v">25 s  &rarr; demo 12.5 s</td></tr><tr><td class="k">Max group size</td><td class="v">3 animals</td></tr><tr><td class="k">Max attempts</td><td class="v">3</td></tr><tr><td class="k">Bench scale</td><td class="v">2.8 cm per field metre</td></tr><tr><td class="k">Carriageway line</td><td class="v">12 m  (34 cm on the bench)</td></tr><tr><td class="k">Acoustic envelope</td><td class="v">42.8 m  (120 cm)</td></tr></tbody></table>
 </div>
 
 <p class="foot">Regenerate with <code>python tools/make_bench.py</code>.</p>
 </div>
 <script>
-const K = {"MAX_GROUP": 3.0, "MAX_ACTIVATION_MS": 6000.0, "MIN_SILENCE_MS": 20000.0, "DAILY_BUDGET_MS": 120000.0, "ESCALATE_AFTER_MS": 25000.0, "MAX_ATTEMPTS": 3.0, "CARRIER_HZ": 25000.0, "DEMO_SPEED": 4.0, "RAMP_MS": 25.0, "DESK_SCALE": 2.8, "RANGE_MAX_M": 42.8, "LINE_M": 12.0};
+const K = {"MAX_GROUP": 3.0, "MAX_ACTIVATION_MS": 6000.0, "MIN_SILENCE_MS": 20000.0, "DAILY_BUDGET_MS": 120000.0, "ESCALATE_AFTER_MS": 25000.0, "MAX_ATTEMPTS": 3.0, "CARRIER_HZ": 25000.0, "DEMO_SPEED": 2.0, "RAMP_MS": 25.0, "DESK_SCALE": 2.8, "RANGE_MAX_M": 42.8, "LINE_M": 12.0};
 
 const el = (id) => document.getElementById(id);
 const lamp = {permit: el("lampPermit"), refuse: el("lampRefuse"),

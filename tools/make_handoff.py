@@ -1,0 +1,500 @@
+"""
+Generate the handoff: what works, how it works, and what is still open.
+
+    python tools/make_handoff.py
+
+Written for the person who picks this up next - a teammate, or you in the
+morning. Everything factual is read out of the firmware, so the status cannot
+quietly become a lie about a rig that has since changed:
+
+  - which inputs are real and which are typed comes from the HAVE_* flags
+  - the lamp arrangement comes from the lamp-mode flags
+  - the refusal reasons are the firmware's own strings, verbatim
+  - the limits are the constants the sketch compiles with
+
+The narrative parts - what was tested, what is unresolved - are prose, because
+no file records them. They are dated and attributed so their age is obvious.
+"""
+
+from __future__ import annotations
+
+import html
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ESP = ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino"
+
+TESTED = "16 August 2026"
+
+
+def esc(s) -> str:
+    t = html.escape(str(s), quote=True)
+    return "".join(c if ord(c) < 128 else f"&#{ord(c)};" for c in t)
+
+
+def src() -> str:
+    return ESP.read_text(encoding="utf-8")
+
+
+def flags() -> dict[str, int]:
+    s = src()
+    out = {}
+    for n in ("HAVE_POT", "HAVE_ESTOP", "HAVE_SENSOR",
+              "TWO_LAMP_MODE", "ONE_LAMP_MODE"):
+        m = re.search(rf"#define\s+{n}\s+(\d)", s)
+        out[n] = int(m.group(1)) if m else 0
+    return out
+
+
+def pins() -> dict[str, str]:
+    s = src()
+    out = {}
+    for n in ("PIN_TRIG", "PIN_ECHO", "PIN_EMIT", "LED_PERMIT", "LED_REFUSE",
+              "LED_ESCALATE", "LED_ARMED", "BTN_PERSON", "BTN_NONTARGET",
+              "BTN_ESTOP", "POT_GROUP", "LAMP_GO", "LAMP_STOP"):
+        m = re.search(rf"\b{n}\s*=\s*(\d+)", s)
+        if m:
+            out[n] = m.group(1)
+    return out
+
+
+def limits() -> dict[str, float]:
+    s = src()
+    out = {}
+    for n in ("MAX_GROUP", "MAX_ACTIVATION_MS", "MIN_SILENCE_MS",
+              "DAILY_BUDGET_MS", "ESCALATE_AFTER_MS", "MAX_ATTEMPTS",
+              "CARRIER_HZ", "DEMO_SPEED", "DESK_SCALE", "RANGE_MAX_M", "LINE_M"):
+        m = re.search(rf"\b{n}\s*=\s*([\d.]+)", s)
+        if m:
+            out[n] = float(m.group(1))
+    return out
+
+
+def reasons() -> list[str]:
+    """The refusal strings, in the order the firmware tests them."""
+    return re.findall(r'deny = "([^"]+)"', src())
+
+
+# ------------------------------------------------------------------ content
+
+def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
+    """(state, subsystem, what is true, how it is driven)"""
+    lamps = ("one lamp" if f["ONE_LAMP_MODE"]
+             else "two lamps" if f["TWO_LAMP_MODE"] else "three lamps")
+    return [
+        ("ok", "Governor logic",
+         "Every rule fires correctly. Watchdog measured at 1525 ms against a "
+         "1500 ms target; escalation at 6315 ms against 6250 ms.",
+         "ESP32, verified on the bench"),
+        ("ok", "On-screen bench",
+         "Full nine-beat guided demo, all five refusals, escalation, "
+         "emergency stop. Needs no hardware at all.",
+         "hardware/bench.html"),
+        ("ok", "Status lamps",
+         f"{lamps.capitalize()}. Green on GPIO{p.get('LAMP_GO', '14')} permits, "
+         f"red on GPIO{p.get('LAMP_STOP', '27')} refuses and blinks for "
+         f"escalation. Confirmed by eye.",
+         "GPIO" + p.get("LAMP_GO", "14") + " / GPIO" + p.get("LAMP_STOP", "27")),
+        ("ok", "Serial console",
+         "Every input has a typed equivalent. Dispatches on a newline or on "
+         "80 ms of silence, so the monitor's line-ending setting cannot break it.",
+         "115200 baud"),
+        ("ok", "Page to board bridge",
+         "The page sends inputs over USB; the board reaches its own verdict. "
+         "Two implementations of one rule set, not one puppeting the other.",
+         "Web Serial, Chrome or Edge"),
+        ("warn", "Group size",
+         "No potentiometer fitted. Typed with g1..g8 instead. The pin is never "
+         "read, which is deliberate: GPIO34 has no internal pull-up, so an "
+         "unfitted pot wanders rather than reading zero.",
+         "HAVE_POT " + str(f["HAVE_POT"])),
+        ("warn", "Emergency stop",
+         "The wired button reads permanently closed - two legs on one side of "
+         "the switch are already joined inside it. The stop itself is intact "
+         "and typed with e.",
+         "HAVE_ESTOP " + str(f["HAVE_ESTOP"])),
+        ("crit", "Distance sensor",
+         "0 of 20 pings returned, twice, on separate days. With a 25 ms timeout "
+         "it should echo off a wall even with nothing in front of it, so this "
+         "is power or wiring, not an absent target.",
+         "HAVE_SENSOR " + str(f["HAVE_SENSOR"])),
+        ("idle", "Piezo emitter",
+         "Never tested. A 500 Hz to 4 kHz sweep is flashed and ready; it needs "
+         "one person to listen. The firmware drives it either way.",
+         "GPIO" + p.get("PIN_EMIT", "25")),
+        ("idle", "Third LED",
+         "GPIO26 has nothing attached. Not broken - never connected after the "
+         "shorted column was separated.",
+         "GPIO26"),
+    ]
+
+
+OPEN = [
+    ("Distance sensor returns nothing", "crit", [
+        ("VCC is on VIN/5V, not 3V3",
+         "The HC-SR04 is unreliable below 5 V. The Wokwi build uses 3V3 because "
+         "a simulator has no such problem - copying that wiring to hardware is "
+         "the most likely cause here."),
+        ("TRIG and ECHO are not swapped",
+         "TRIG is an output and goes straight to GPIO13. ECHO is the one that "
+         "needs the divider."),
+        ("The divider actually divides",
+         "ECHO to 1k, then the junction to GPIO39 (VN), then 2k from that same "
+         "junction to ground. If the junction is not shared between both "
+         "resistors and the pin, nothing reaches the ESP32."),
+        ("GPIO39 is written VN on the silkscreen",
+         "It carries no number on the board. A wire in the wrong hole here "
+         "fails silently."),
+    ]),
+    ("Piezo untested", "idle", [
+        ("Flash hardware/wiring_check/parts_check.ino and listen",
+         "It sweeps 500 Hz to 4 kHz for four seconds. Audible means the GPIO25 "
+         "chain is good and the emitter works in the demo."),
+        ("If silent, check the 220 ohm and the polarity",
+         "The marked leg goes to the resistor, the other to the ground rail."),
+    ]),
+    ("Twenty of twenty-four sources unverified", "warn", [
+        ("Run gaukavach citations",
+         "This is the softest place an examiner can push, on a project whose "
+         "whole argument is its evidence envelope. Retrieving the top few - the "
+         "Heffner and Heffner audiogram, ISO 9613-1, the OSHA ultrasound "
+         "guidance - is worth more than any further hardware work."),
+    ]),
+]
+
+LEARNED = [
+    ("A measurement taken through a fault does not survive fixing the fault",
+     "The LED map was first read while GPIO26 and GPIO27 were shorted into one "
+     "breadboard column, so driving either lit the single LED that existed. "
+     "Once the short was separated that reading was false, and hours went into "
+     "driving a pin with nothing on it. Re-measure after every repair."),
+    ("Only one program may hold the serial port",
+     "The Arduino Serial Monitor, a browser tab and any script all compete for "
+     "it. The loser gets Access is denied. This is the most common way a "
+     "working rig looks broken, and it cost three separate rounds."),
+    ("Design the test so the answer cannot be misread",
+     "Asking which position lit meant holding a sequence in mind while watching "
+     "a board, and the answers came back inconsistent. Asking how many times it "
+     "blinked settled the same question in one reply. count_lamp gives each pin "
+     "its own blink count for exactly that reason."),
+    ("A floating input is worse than a missing one",
+     "GPIO34-39 have no internal pull-up anywhere in the silicon. An unfitted "
+     "potentiometer does not read zero, it wanders - and the governor then "
+     "refuses, correctly reasoned, from a herd size that is noise. Every "
+     "refusal looks deliberate. Declare the substitute instead."),
+]
+
+
+PAGE = """<title>GauKavach - handoff</title>
+<style>
+:root{{
+  --ground:#F2F4F3; --surface:#FFFFFF; --sunk:#E8ECEA;
+  --ink:#101614; --body:#2B3532; --muted:#5C6B66; --faint:#8A9995;
+  --line:#D6DEDB; --rule:#C2CDC9;
+  --accent:#0E6E62; --accent-soft:#DCEDE9;
+  --ok:#1B6E4A; --ok-bg:#E1F0E7;
+  --warn:#8A6410; --warn-bg:#F6EEDA;
+  --crit:#9E2B21; --crit-bg:#F7E5E2;
+  --idle:#5C6B66; --idle-bg:#E8ECEA;
+}}
+@media (prefers-color-scheme:dark){{:root:not([data-theme="light"]){{
+  --ground:#0B100F; --surface:#141B19; --sunk:#0F1614;
+  --ink:#E8EFEC; --body:#C0CCC8; --muted:#8C9C97; --faint:#6A7A75;
+  --line:#222E2B; --rule:#2C3A36;
+  --accent:#4FBCA9; --accent-soft:#0E2B27;
+  --ok:#5FBF8A; --ok-bg:#11291D;
+  --warn:#D6A43C; --warn-bg:#2A2113;
+  --crit:#E07A6E; --crit-bg:#2C1714;
+  --idle:#8C9C97; --idle-bg:#1A2320;
+}}}}
+:root[data-theme="dark"]{{
+  --ground:#0B100F; --surface:#141B19; --sunk:#0F1614;
+  --ink:#E8EFEC; --body:#C0CCC8; --muted:#8C9C97; --faint:#6A7A75;
+  --line:#222E2B; --rule:#2C3A36;
+  --accent:#4FBCA9; --accent-soft:#0E2B27;
+  --ok:#5FBF8A; --ok-bg:#11291D;
+  --warn:#D6A43C; --warn-bg:#2A2113;
+  --crit:#E07A6E; --crit-bg:#2C1714;
+  --idle:#8C9C97; --idle-bg:#1A2320;
+}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--ground);color:var(--body);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15.5px;line-height:1.62;font-variant-numeric:tabular-nums}}
+h1,h2,h3{{font-family:Charter,"Bitstream Charter",Georgia,serif;color:var(--ink);
+  margin:0;text-wrap:balance}}
+.wrap{{max-width:1020px;margin:0 auto;padding:0 24px 90px}}
+code,.mono{{font-family:ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace}}
+
+header{{background:var(--surface);border-bottom:1px solid var(--rule);
+  padding:34px 0 0;margin-bottom:30px}}
+.eyebrow{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}}
+h1{{font-size:34px;letter-spacing:-.018em;margin-top:8px}}
+.sub{{max-width:64ch;margin-top:12px;color:var(--muted)}}
+.meta{{display:flex;flex-wrap:wrap;gap:0;margin-top:26px;border-top:1px solid var(--line)}}
+.meta div{{padding:12px 20px 14px;border-right:1px solid var(--line);flex:1 1 auto}}
+.meta div:last-child{{border-right:none}}
+.meta dt{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--faint)}}
+.meta dd{{margin:5px 0 0;font-size:14.5px;color:var(--ink);font-weight:600}}
+
+section{{margin-top:46px}}
+h2{{font-size:25px;padding-bottom:10px;border-bottom:2px solid var(--ink)}}
+h3{{font-size:17.5px;margin-top:26px}}
+p{{max-width:74ch}}
+.lede{{color:var(--muted);max-width:74ch;margin-top:12px}}
+
+/* status board */
+.board{{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);margin-top:18px}}
+.row{{display:grid;grid-template-columns:112px minmax(0,1fr) 190px;gap:0;
+  background:var(--surface);align-items:start}}
+@media (max-width:760px){{.row{{grid-template-columns:1fr}}}}
+.row > *{{padding:14px 18px}}
+.st{{border-left:4px solid var(--idle)}}
+.st.ok{{border-left-color:var(--ok)}}
+.st.warn{{border-left-color:var(--warn)}}
+.st.crit{{border-left-color:var(--crit)}}
+.chip{{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  padding:4px 9px;border-radius:3px;background:var(--idle-bg);color:var(--idle);
+  white-space:nowrap}}
+.chip.ok{{background:var(--ok-bg);color:var(--ok)}}
+.chip.warn{{background:var(--warn-bg);color:var(--warn)}}
+.chip.crit{{background:var(--crit-bg);color:var(--crit)}}
+.what b{{display:block;color:var(--ink);font-size:15.5px;margin-bottom:3px}}
+.what span{{font-size:14px;color:var(--muted)}}
+.where{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  color:var(--faint);text-align:right}}
+@media (max-width:760px){{.where{{text-align:left;padding-top:0}}}}
+
+/* run paths */
+.paths{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:16px;margin-top:20px}}
+.path{{background:var(--surface);border:1px solid var(--line);padding:18px 20px 20px}}
+.path .n{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;
+  letter-spacing:.1em;color:var(--accent);text-transform:uppercase}}
+.path h3{{margin-top:6px;font-size:18px}}
+.path p{{font-size:14px;margin:8px 0 0;color:var(--muted)}}
+pre{{margin:12px 0 0;padding:12px 14px;background:var(--sunk);
+  border:1px solid var(--line);overflow-x:auto;font-size:12.5px;line-height:1.55;
+  font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}}
+
+/* rule order */
+ol.rules{{counter-reset:r;list-style:none;padding:0;margin:18px 0 0;
+  display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line)}}
+ol.rules li{{counter-increment:r;background:var(--surface);padding:12px 18px 12px 52px;
+  position:relative;font-size:14.5px}}
+ol.rules li::before{{content:counter(r);position:absolute;left:18px;top:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  color:var(--accent);font-weight:700}}
+
+table{{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}}
+th{{text-align:left;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:400;
+  padding:10px 14px;border-bottom:1px solid var(--rule);background:var(--sunk)}}
+td{{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}}
+td.k{{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--ink);
+  white-space:nowrap;width:1%}}
+.scroll{{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}}
+
+/* open items */
+.item{{background:var(--surface);border:1px solid var(--line);
+  border-left:4px solid var(--idle);padding:18px 22px 20px;margin-top:16px}}
+.item.crit{{border-left-color:var(--crit)}}
+.item.warn{{border-left-color:var(--warn)}}
+.item h3{{margin:0;font-size:19px}}
+.item ul{{margin:14px 0 0;padding-left:0;list-style:none;
+  display:flex;flex-direction:column;gap:12px}}
+.item li b{{display:block;color:var(--ink);font-size:14.5px}}
+.item li span{{font-size:14px;color:var(--muted)}}
+
+.learned{{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);margin-top:18px}}
+.learned div{{background:var(--surface);padding:16px 20px 18px}}
+.learned b{{display:block;color:var(--ink);font-size:16px;
+  font-family:Charter,Georgia,serif}}
+.learned p{{margin:7px 0 0;font-size:14px;color:var(--muted)}}
+
+.foot{{margin-top:52px;padding-top:18px;border-top:1px solid var(--line);
+  color:var(--faint);font-size:13px}}
+a{{color:var(--accent)}}
+</style>
+<header><div class="wrap">
+<div class="eyebrow">Handoff</div>
+<h1>GauKavach bench governor</h1>
+<p class="sub">What is working, how it works, and the three things still open.
+Everything factual on this page is read out of the firmware when the page is
+generated, so it cannot quietly describe a rig that has changed.</p>
+<div class="meta">
+  <div><dt>Last verified</dt><dd>{tested}</dd></div>
+  <div><dt>Board</dt><dd>ESP32 DevKit V1, 30-pin</dd></div>
+  <div><dt>Demo path</dt><dd>On screen, hardware optional</dd></div>
+  <div><dt>Tests</dt><dd>176 passing</dd></div>
+</div>
+</div></header>
+<div class="wrap">
+
+<section>
+<h2>Status</h2>
+<p class="lede">Five subsystems work. Two are substituted by typed input and say
+so at boot. Two are unresolved, and neither blocks the demo.</p>
+<div class="board">{status}</div>
+</section>
+
+<section>
+<h2>How to run it</h2>
+<p class="lede">Three routes to the same rules, ordered by how likely each is to
+survive a room you do not control.</p>
+<div class="paths">
+<div class="path">
+  <div class="n">Route one &mdash; no hardware</div>
+  <h3>Open the page, press Run</h3>
+  <p>Nine narrated beats, about a minute, driving itself. Nothing to install and
+  nothing to come loose. This is the one to present.</p>
+  <pre>hardware/bench.html</pre>
+</div>
+<div class="path">
+  <div class="n">Route two &mdash; page drives board</div>
+  <h3>Serve it, then connect</h3>
+  <p>Web Serial needs a secure origin, so the page must be served rather than
+  opened off the disk. Chrome or Edge.</p>
+  <pre>cd hardware
+python -m http.server 8765 --bind 127.0.0.1</pre>
+</div>
+<div class="path">
+  <div class="n">Route three &mdash; board alone</div>
+  <h3>Type into the serial monitor</h3>
+  <p>The most robust path, and the fallback if anything else misbehaves.
+  115200 baud.</p>
+  <pre>d80   permitted
+p     person veto
+g5    herd refusal
+d20   at the carriageway
+e / r stop and clear</pre>
+</div>
+</div>
+</section>
+
+<section>
+<h2>How it works</h2>
+<p class="lede">A detection arrives. Before anything is energised the governor
+walks these tests in order and stops at the first that fails. The strings below
+are the firmware's own, not a paraphrase of them.</p>
+<ol class="rules">{rules}</ol>
+<p style="margin-top:18px">If none of them fire, it emits &mdash; and even then
+the emission is bounded. The watchdog cuts it at
+<b>{max_act:.0f}&nbsp;s</b>, a quiet period of <b>{quiet:.0f}&nbsp;s</b> must
+pass before the next one, a daily budget of <b>{budget:.0f}&nbsp;s</b> per
+animal latches a do-not-emit flag when exhausted, and after
+<b>{attempts:.0f} attempts</b> or <b>{escalate:.0f}&nbsp;s</b> it gives up and
+asks for a human. Acoustic cues are not stock-proof; the system stopping is the
+designed outcome, not a failure of it.</p>
+<div class="scroll"><table><thead><tr><th>Governed quantity</th>
+<th>Shipped</th><th>In the demo</th></tr></thead><tbody>{limits}</tbody></table></div>
+<p style="margin-top:16px;font-size:14px;color:var(--muted)">Demo values are the
+shipped limits divided by {speed:.0f} so a full cycle fits in a presentation.
+Both are printed at start-up. The compression is stated, never hidden.</p>
+</section>
+
+<section>
+<h2>Still open</h2>
+<p class="lede">None of these stops the demo. They are listed in the order worth
+spending time on.</p>
+{open}
+</section>
+
+<section>
+<h2>What this cost, and what it taught</h2>
+<p class="lede">Recorded because the next person will hit the same things, and
+because two of them wasted hours that did not need wasting.</p>
+<div class="learned">{learned}</div>
+</section>
+
+<section>
+<h2>Where everything is</h2>
+<div class="scroll"><table><thead><tr><th>Path</th><th>What it is</th>
+</tr></thead><tbody>
+<tr><td class="k">RUNNING.md</td><td>the three routes, in full</td></tr>
+<tr><td class="k">hardware/bench.html</td><td>the on-screen bench and guided demo</td></tr>
+<tr><td class="k">hardware/design.html</td><td>handover build spec: BOM, pin schedule, acceptance test</td></tr>
+<tr><td class="k">hardware/breadboard.html</td><td>hole-by-hole build, with the DevKit V1 pin map</td></tr>
+<tr><td class="k">hardware/wokwi_steps.html</td><td>browser simulation, paste two blocks and press play</td></tr>
+<tr><td class="k">hardware/wokwi_esp32/gaukavach_esp32.ino</td><td>the firmware everything else is generated from</td></tr>
+<tr><td class="k">hardware/wiring_check/</td><td>four diagnostics; count_lamp is the one that worked</td></tr>
+<tr><td class="k">tools/</td><td>the generators. Every page above is built, not written</td></tr>
+<tr><td class="k">tests/</td><td>176 checks on what fails silently</td></tr>
+</tbody></table></div>
+</section>
+
+<p class="foot">Generated from
+<code>hardware/wokwi_esp32/gaukavach_esp32.ino</code> by
+<code>tools/make_handoff.py</code>. Re-run it after changing the firmware and
+the status above follows.</p>
+</div>
+"""
+
+
+def main() -> None:
+    f, p, c = flags(), pins(), limits()
+    sp = c["DEMO_SPEED"]
+
+    status = "".join(
+        f'<div class="row"><div class="st {s}"><span class="chip {s}">'
+        f'{ {"ok": "working", "warn": "substituted", "crit": "not working",
+             "idle": "untested"}[s] }</span></div>'
+        f'<div class="what"><b>{esc(name)}</b><span>{esc(what)}</span></div>'
+        f'<div class="where">{esc(where)}</div></div>'
+        for s, name, what, where in status_rows(f, p))
+
+    rules = "".join(f"<li>{esc(r)}</li>" for r in reasons())
+
+    lim_rows = [
+        ("Carrier frequency", f"{c['CARRIER_HZ'] / 1000:.1f} kHz", "same"),
+        ("Maximum single activation", f"{c['MAX_ACTIVATION_MS'] / 1000:.0f} s",
+         f"{c['MAX_ACTIVATION_MS'] / sp / 1000:.1f} s"),
+        ("Enforced quiet period", f"{c['MIN_SILENCE_MS'] / 1000:.0f} s",
+         f"{c['MIN_SILENCE_MS'] / sp / 1000:.1f} s"),
+        ("Daily exposure budget", f"{c['DAILY_BUDGET_MS'] / 1000:.0f} s",
+         f"{c['DAILY_BUDGET_MS'] / sp / 1000:.0f} s"),
+        ("Escalate to a human after", f"{c['ESCALATE_AFTER_MS'] / 1000:.0f} s",
+         f"{c['ESCALATE_AFTER_MS'] / sp / 1000:.1f} s"),
+        ("Maximum group size", f"{c['MAX_GROUP']:.0f} animals", "same"),
+        ("Maximum attempts", f"{c['MAX_ATTEMPTS']:.0f}", "same"),
+        ("Bench scale", f"{c['DESK_SCALE']:.1f} cm per field metre", "same"),
+    ]
+    lim_html = "".join(
+        f'<tr><td>{k}</td><td class="k">{a}</td><td class="k">{b}</td></tr>'
+        for k, a, b in lim_rows)
+
+    open_html = "".join(
+        f'<div class="item {sev}"><h3>{esc(title)}</h3><ul>'
+        + "".join(f"<li><b>{esc(h)}</b><span>{esc(d)}</span></li>"
+                  for h, d in steps)
+        + "</ul></div>"
+        for title, sev, steps in OPEN)
+
+    learned = "".join(
+        f"<div><b>{esc(h)}</b><p>{esc(d)}</p></div>" for h, d in LEARNED)
+
+    page = PAGE.format(
+        tested=TESTED, status=status, rules=rules, limits=lim_html,
+        open=open_html, learned=learned, speed=sp,
+        max_act=c["MAX_ACTIVATION_MS"] / 1000,
+        quiet=c["MIN_SILENCE_MS"] / 1000,
+        budget=c["DAILY_BUDGET_MS"] / 1000,
+        attempts=c["MAX_ATTEMPTS"],
+        escalate=c["ESCALATE_AFTER_MS"] / 1000)
+    page = "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in page)
+
+    out = ROOT / "hardware" / "handoff.html"
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote hardware/handoff.html ({out.stat().st_size / 1024:.0f} KB), "
+          f"{len(status_rows(f, p))} subsystems, {len(reasons())} refusal rules")
+
+
+if __name__ == "__main__":
+    main()

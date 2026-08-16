@@ -35,6 +35,7 @@ PAGES = [
     "dashboard/index.html",
     "dashboard/simulator.html",
     "hardware/bench.html",
+    "hardware/handoff.html",
     "hardware/design.html",
     "hardware/breadboard.html",
     "hardware/build_steps.html",

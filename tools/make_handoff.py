@@ -124,9 +124,12 @@ def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
           "timeout it should echo off a wall even with nothing in front of it, "
           "so this is power or wiring, not an absent target."),
          "HAVE_SENSOR " + str(f["HAVE_SENSOR"])),
-        ("idle", "Piezo emitter",
-         "Never tested. A 500 Hz to 4 kHz sweep is flashed and ready; it needs "
-         "one person to listen. The firmware drives it either way.",
+        ("warn", "Piezo emitter",
+         "No response on GPIO25 to a 500 Hz sweep at full duty, which is "
+         "unmissable if the chain is intact - so it is not wired to that pin. "
+         "It also does not matter: the carrier is 25 kHz and inaudible even "
+         "when perfectly wired, so the lamp and the log are what show emission. "
+         "The firmware drives the pin regardless.",
          "GPIO" + p.get("PIN_EMIT", "25")),
         ("idle", "Third LED",
          "GPIO26 has nothing attached. Not broken - never connected after the "
@@ -152,12 +155,21 @@ OPEN = [
          "It carries no number on the board. A wire in the wrong hole here "
          "fails silently."),
     ]),
-    ("Piezo untested", "idle", [
-        ("Flash hardware/wiring_check/parts_check.ino and listen",
-         "It sweeps 500 Hz to 4 kHz for four seconds. Audible means the GPIO25 "
-         "chain is good and the emitter works in the demo."),
-        ("If silent, check the 220 ohm and the polarity",
-         "The marked leg goes to the resistor, the other to the ground rail."),
+    ("Piezo not on GPIO25", "warn", [
+        ("Worth knowing, not worth fixing before a demo",
+         "The carrier is 25 kHz. A correctly wired piezo is silent throughout, "
+         "so nothing visible or audible changes by repairing this. Emission is "
+         "shown by the lamp and the serial log, which is the design, not a "
+         "substitute for it."),
+        ("If you do fix it: 220 ohm from GPIO25, marked leg to the resistor",
+         "Then flash hardware/wiring_check/piezo_check.ino. Part one sweeps "
+         "500 Hz to 4 kHz and is unmissable when the chain is good; part two "
+         "plays the real 25 kHz carrier and should be silent."),
+        ("Silence at 25 kHz is the achievement",
+         "Arduino tone() hard-gates its square wave, which splatters broadband "
+         "energy into the audible band and clicks at every activation - the "
+         "failure OSHA documents. The raised-cosine envelope on this sketch is "
+         "there precisely so there is no click to hear."),
     ]),
     ("Twenty of twenty-four sources unverified", "warn", [
         ("Run gaukavach citations",

@@ -303,13 +303,27 @@ uint8_t readGroup() {
  * which it was in the log. Do not narrate a typed veto as a wired one.
  */
 bool  typedPerson = false, typedNonTarget = false;
-float simDistanceCm = 999.0f;   // used when no sensor is fitted
+float simDistanceCm = 999.0f;
+
+/* A typed distance overrides the sensor until the next reset.
+ *
+ * Without this, enabling the sensor silently disabled the console's d command:
+ * it was still accepted and still acknowledged, and the governor went on
+ * reading the sensor. Anything driving the board over USB - the web bench, for
+ * instance - would appear to do nothing, while the log insisted the distance
+ * had been set. An input that reports success and changes nothing is worse
+ * than one that is missing.
+ *
+ * Cleared by r, so 'r' means "go back to trusting the sensor". */
+bool  distanceOverride = false;
 
 void consoleHelp() {
   Serial.println("console: g1..g8 group size | p person veto | n dog/goat veto");
   Serial.println("         e e-stop | r clear latches | ? this help");
-#if !HAVE_SENSOR
-  Serial.println("         d0..d400 distance in cm, e.g. d80 -> permitted");
+#if HAVE_SENSOR
+  Serial.println("         d0..d400 overrides the sensor until r, e.g. d25");
+#else
+  Serial.println("         d0..d400 distance in cm, e.g. d25 -> permitted");
 #endif
 #if !HAVE_POT
   Serial.println("         no pot fitted, so group size comes from g1..g8");
@@ -330,6 +344,7 @@ void consoleRun(char *line, uint8_t len) {
   } else if (cmd == 'd') {
     if (arg >= 0 && arg <= 400) {
       simDistanceCm = (float)arg;
+      distanceOverride = true;          // stop reading the sensor until r
       Serial.printf("console: distance set to %ld cm (%.1f m scaled)\n",
                     arg, arg / DESK_SCALE);
     } else {
@@ -358,6 +373,7 @@ void consoleRun(char *line, uint8_t len) {
     doNotEmit = false;
     typedPerson = false;
     typedNonTarget = false;
+    distanceOverride = false;      // back to the sensor
     exposureUsedMs = 0;
     state = IDLE;
     attempts = 0;
@@ -674,7 +690,7 @@ void loop() {
   if (now - lastBeat > 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
 
 #if HAVE_SENSOR
-  float cm = readRangeCm();
+  float cm = distanceOverride ? simDistanceCm : readRangeCm();
 #else
   float cm = simDistanceCm;
 #endif

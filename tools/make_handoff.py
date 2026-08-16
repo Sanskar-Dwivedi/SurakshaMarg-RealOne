@@ -92,9 +92,10 @@ def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
          "emergency stop. Needs no hardware at all.",
          "hardware/bench.html"),
         ("ok", "Status lamps",
-         f"{lamps.capitalize()}. Green on GPIO{p.get('LAMP_GO', '14')} permits, "
-         f"red on GPIO{p.get('LAMP_STOP', '27')} refuses and blinks for "
-         f"escalation. Confirmed by eye.",
+         f"Green on GPIO{p.get('LAMP_GO', '14')} permits, red on "
+         f"GPIO{p.get('LAMP_STOP', '27')} refuses and blinks for escalation, "
+         f"yellow on GPIO26 marks out of range. Each confirmed by making the "
+         f"pin blink its own number, so the mapping is a count and not a guess.",
          "GPIO" + p.get("LAMP_GO", "14") + " / GPIO" + p.get("LAMP_STOP", "27")),
         ("ok", "Serial console",
          "Every input has a typed equivalent. Dispatches on a newline or on "
@@ -124,17 +125,18 @@ def status_rows(f: dict[str, int], p: dict[str, str]) -> list[tuple]:
           "timeout it should echo off a wall even with nothing in front of it, "
           "so this is power or wiring, not an absent target."),
          "HAVE_SENSOR " + str(f["HAVE_SENSOR"])),
-        ("warn", "Piezo emitter",
-         "No response on GPIO25 to a 500 Hz sweep at full duty, which is "
-         "unmissable if the chain is intact - so it is not wired to that pin. "
-         "It also does not matter: the carrier is 25 kHz and inaudible even "
-         "when perfectly wired, so the lamp and the log are what show emission. "
-         "The firmware drives the pin regardless.",
+        ("ok", "Piezo emitter",
+         "Wired and answering an audible sweep. Silent during the demo, which "
+         "is correct: the carrier is 25 kHz and the raised-cosine envelope "
+         "exists so there is no click to hear either. The lamp and the log are "
+         "what show emission.",
          "GPIO" + p.get("PIN_EMIT", "25")),
-        ("idle", "Third LED",
-         "GPIO26 has nothing attached. Not broken - never connected after the "
-         "shorted column was separated.",
-         "GPIO26"),
+        ("ok", "Third lamp",
+         "Yellow on GPIO26, lit for one refusal only: the target is beyond "
+         "acoustic range. That is the one refusal about geometry rather than "
+         "about the animal, so the three lamps read as a map - red too close, "
+         "green in range, yellow too far.",
+         "GPIO26, FAR_LAMP_MODE 1"),
     ]
 
 
@@ -155,7 +157,7 @@ OPEN = [
          "It carries no number on the board. A wire in the wrong hole here "
          "fails silently."),
     ]),
-    ("Piezo not on GPIO25", "warn", [
+    ("__RESOLVED_PIEZO__", "warn", [
         ("Worth knowing, not worth fixing before a demo",
          "The carrier is 25 kHz. A correctly wired piezo is silent throughout, "
          "so nothing visible or audible changes by repairing this. Emission is "
@@ -457,6 +459,7 @@ the status above follows.</p>
 
 def main() -> None:
     f, p, c = flags(), pins(), limits()
+    OPEN[:] = [o for o in OPEN if not o[0].startswith("__RESOLVED")]
     if f["HAVE_SENSOR"]:
         # resolved: keep the page honest rather than carrying a fixed fault
         OPEN[:] = [o for o in OPEN if not o[0].startswith("Distance sensor")]

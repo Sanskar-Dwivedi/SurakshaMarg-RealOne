@@ -99,14 +99,13 @@ const int POT_GROUP     = 34;   // ADC1, input-only
  * the emergency stop remain typed. */
 #define HAVE_SENSOR 1
 
-/* Set to 1 when only two of the three status LEDs work. Measured on this
- * board: GPIO26 and GPIO14 drive lamps, GPIO27 drives nothing. Rather than
- * lose a state, escalation blinks the stop lamp instead of owning a colour.
- * The reference build is still three lamps; this is one rig's reality. */
+/* Two colours carry the four states, with escalation blinking rather than
+ * owning a third colour. All three lamps on this rig now work - see
+ * FAR_LAMP_MODE below, which gives the third one a job of its own. */
 #define TWO_LAMP_MODE 1
 
-/* Set to 1 when exactly one status LED works. Measured on this board: GPIO14
- * lights, GPIO26 and GPIO27 do not.
+/* Set to 1 when exactly one status LED works. Not the case here any more; kept
+ * because a rig can always lose a lamp an hour before it is needed.
  *
  * One lamp still carries three states, by rate rather than by colour: solid
  * while emitting, a slow pulse while refusing, a fast flutter once it has
@@ -116,15 +115,15 @@ const int POT_GROUP     = 34;   // ADC1, input-only
  * the time, and that is the argument, not a limitation of it. */
 #define ONE_LAMP_MODE 0
 #if TWO_LAMP_MODE || ONE_LAMP_MODE
-/* Measured with count_lamp, each pin blinking its own number: the red lamp
- * answers on GPIO27 and the green on GPIO14. GPIO26 has nothing attached.
+/* Measured with count_lamp, each pin blinking its own number: green on GPIO14,
+ * red on GPIO27, and yellow on GPIO26 once it was wired.
  *
- * Worth recording why that was not obvious. The first mapping was taken while
+ * Worth recording why that took so long. The first mapping was taken while
  * GPIO26 and GPIO27 were shorted together in one breadboard column, so driving
  * either lit the single LED that existed, and GPIO26 looked like the red lamp.
- * Once the short was fixed the reading was stale, and every later test drove a
- * pin with nothing on it. Measurements taken through a fault do not survive
- * the fix. */
+ * Once the short was fixed that reading was false, and every later test drove a
+ * pin with nothing on it. Measurements taken through a fault do not survive the
+ * fix - re-measure after every repair, including this comment. */
 const int LAMP_GO   = 14;      // green: permitted
 const int LAMP_STOP = 27;      // red: refused, and blinking for escalated
 const int LAMP_ONE  = 14;
@@ -141,7 +140,7 @@ const int LAMP_ONE  = 14;
  * The other four refusals share the red lamp. They are about who or what is
  * there, not where. */
 #define FAR_LAMP_MODE 1
-const int LAMP_FAR = 26;
+const int LAMP_FAR = 26;      // yellow on this rig
 bool farRefusal = false;
 
 /* ---------------- LEDC ---------------- */
@@ -509,6 +508,9 @@ void selfCheck() {
 #if ONE_LAMP_MODE
   Serial.println("    one lamp, not three: solid means emitting, a slow pulse "
                  "means refused, a fast flutter means it gave up");
+#elif TWO_LAMP_MODE && FAR_LAMP_MODE
+  Serial.println("    lamps: green permits, red refuses, red blinking is "
+                 "escalation, yellow is out of acoustic range");
 #elif TWO_LAMP_MODE
   Serial.println("    two lamps, not three: green permits, red refuses, "
                  "red blinking is escalation");

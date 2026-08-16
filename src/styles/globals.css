@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg-cream: #F5F3EC;
+    --color-bg-cream-dark: #E8E4D8;
+    --color-bg-surface: #FFFFFF;
+    --color-bg-beige: #EADFCB;
+    --color-text-charcoal: #141619;
+    --color-text-muted: #4B535E;
+    --color-border-warm: #D9D0BE;
+    --color-accent-olive: #385C2E;
+    --color-accent-terracotta: #AC3B1E;
+  }
+
+  body {
+    background-color: var(--color-bg-cream);
+    color: var(--color-text-charcoal);
+    font-family: 'Outfit', 'Sora', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.015em;
+  }
+
+  h1, h2, h3, .font-serif-title {
+    font-family: 'Fraunces', 'Outfit', serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  p, span, table, input, select {
+    font-family: 'Manrope', 'Outfit', sans-serif;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #E8E4D8;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #385C2E;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1C3A24;
+}
+
+/* Clear Focus Rings */
+*:focus-visible {
+  outline: 3px solid #385C2E;
+  outline-offset: 2px;
+}
+
+/* Radar Pulse Animation */
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+}
+
+.animate-radar {
+  animation: radar-pulse 3s infinite ease-in-out;
+}
+
+@keyframes scan-line {
+  0% {
+    top: 0%;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+.animate-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, rgba(56, 92, 46, 0.6) 50%, transparent 100%);
+  animation: scan-line 5s linear infinite;
+  pointer-events: none;
+}

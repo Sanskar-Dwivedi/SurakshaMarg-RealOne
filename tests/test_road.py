@@ -229,3 +229,80 @@ def test_the_module_never_sets_the_notified_flag_itself():
     assert setters == ["incident.authority_notified = True"], (
         f"authority_notified is set somewhere unexpected: {setters}"
     )
+
+
+# -- regressions: bugs the first twenty tests did not catch ------------------
+
+def _rolling(tid, pts_per_frame, frames, start=(640, 600), keep=8):
+    """Yield a track whose history rolls forward by pts_per_frame each frame."""
+    hist = [start] * keep
+    for i in range(frames):
+        dx, dy = pts_per_frame
+        hist.append((hist[-1][0] + dx, hist[-1][1] + dy))
+        x, y = hist[-1]
+        yield Track(tid, "car", (x - 20, y - 40, x + 20, y), 0.9,
+                    history=list(hist[-keep:]))
+
+
+def test_an_event_clears_when_its_condition_stops_not_when_the_track_leaves():
+    """
+    A car stops, is flagged, then drives off while staying in shot.
+
+    The first version keyed the clear-up on whether the TRACK was still
+    visible, so the car stayed listed as stopped for as long as it remained on
+    camera, with a frozen duration.
+    """
+    w = RoadWatch(site=SITE)
+    still = track("car", [(640, 600)] * 8, tid="V10")
+    for i in range(40):
+        out = w.step([still], now_s=i / 10.0, fps=10.0, frame_index=i)
+    assert STOPPED_IN_LANE in {e["kind"] for e in out["active"]}
+
+    for i, t in enumerate(_rolling("V10", (40, 0), 40), start=40):
+        out = w.step([t], now_s=i / 10.0, fps=10.0, frame_index=i)
+    assert w.ground_speed_ms(t, 10.0) > 1.0, "fixture is not actually moving"
+    assert not out["active"], "the event outlived the condition that raised it"
+
+
+def test_stopping_twice_does_not_escalate_on_the_second_stop():
+    """
+    The dangerous form of the same bug: because the event was never cleared,
+    a later `_observe` advanced last_seen_s against the ORIGINAL first_seen_s,
+    so duration jumped straight past escalate_after_s and put a human onto a
+    car that had merely braked twice.
+    """
+    w = RoadWatch(site=SITE, escalate_after_s=8.0)
+    escalations = 0
+    still = track("car", [(640, 600)] * 8, tid="V11")
+    for i in range(40):                                   # 4 s stopped
+        escalations += len(w.step([still], i / 10.0, 10.0, i)["escalate"])
+    for i, t in enumerate(_rolling("V11", (40, 0), 40), start=40):
+        escalations += len(w.step([t], i / 10.0, 10.0, i)["escalate"])
+    again = track("car", [(300, 600)] * 8, tid="V11")
+    for i in range(80, 110):                              # 3 s stopped again
+        escalations += len(w.step([again], i / 10.0, 10.0, i)["escalate"])
+    assert escalations == 0, "neither stop lasted 8 s; nobody should be called"
+
+
+def test_speed_is_read_from_a_bounded_window_not_the_whole_track_life():
+    """
+    History belongs to the caller's tracker and may cover the whole life of the
+    track. Measured end to end, a vehicle that drove in and then parked keeps
+    reporting the speed of its arrival and never reads as stopped.
+    """
+    w = RoadWatch(site=SITE, speed_window=6)
+    arrived_then_parked = [(200 + i * 40, 600) for i in range(10)] + [(600, 600)] * 10
+    t = track("car", arrived_then_parked, tid="V12")
+    assert w.ground_speed_ms(t, 10.0) < w.stopped_speed_ms, (
+        "a parked car is still being credited with the speed it arrived at"
+    )
+
+
+def test_direction_and_speed_agree_about_which_interval_they_describe():
+    """Wrong-way reads the same trailing window as the speed gate before it."""
+    w = RoadWatch(site=SITE, flow_dz=1.0, speed_window=4)
+    reversed_recently = [(640, 640)] * 6 + [(640, 620), (640, 600), (640, 580)]
+    t = track("car", reversed_recently, tid="V13")
+    pts = w._window(t)
+    assert len(pts) == 4, "the window is not the size it claims"
+    assert pts == reversed_recently[-4:]

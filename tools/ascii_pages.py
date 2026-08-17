@@ -34,10 +34,12 @@ ROOT = Path(__file__).resolve().parents[1]
 PAGES = [
     "dashboard/index.html",
     "dashboard/simulator.html",
+    "dashboard/simulator_template.html",
     "hardware/bench.html",
     "hardware/handoff.html",
     "hardware/design.html",
     "hardware/breadboard.html",
+    "hardware/clear_breadboard.html",
     "hardware/build_steps.html",
     "hardware/wokwi_steps.html",
     "hardware/wiring.html",

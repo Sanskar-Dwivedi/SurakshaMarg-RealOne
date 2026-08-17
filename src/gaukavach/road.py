@@ -181,9 +181,15 @@ class RoadWatch:
     escalate_after_s: float = 8.0   # hold before a human is asked to look
     stopped_speed_ms: float = 0.6   # below this counts as stopped
     min_speed_ms: float = 1.0       # below this, direction is meaningless noise
+    speed_window: int = 6           # trailing points used for speed and direction
 
     events: dict[tuple[str, str], Event] = field(default_factory=dict)
     incidents: list[Incident] = field(default_factory=list)
+
+    # (kind, track_id) whose condition actually held on the current frame.
+    # Rebuilt every step; see the note in `step` for why presence of the track
+    # is not enough.
+    _fired: set[tuple[str, str]] = field(default_factory=set, repr=False)
 
     # -- geometry ------------------------------------------------------------
 
@@ -197,6 +203,19 @@ class RoadWatch:
         """Foot point, not centroid: a tall box's centre floats above the road."""
         return point_in_polygon(track.foot_point, self.site.carriageway)
 
+    def _window(self, track: Track) -> list[tuple[float, float]]:
+        """
+        The trailing slice of history that speed and direction are read from.
+
+        Bounded on purpose. `Track.history` is owned by the caller's tracker and
+        may hold the whole life of the track, and measuring across all of it
+        gives a lifetime average: a vehicle that drove in and then parked keeps
+        reporting the speed of its arrival, so it never registers as stopped.
+        A trailing window answers "what is it doing now", which is the only
+        question any of these detectors is asking.
+        """
+        return list(track.history[-max(2, self.speed_window):])
+
     def ground_speed_ms(self, track: Track, fps: float) -> float:
         """
         Track speed in m/s, measured on the ground plane rather than in pixels.
@@ -207,9 +226,10 @@ class RoadWatch:
         """
         if len(track.history) < 2 or fps <= 0:
             return 0.0
-        a = self.site.ground_xz(track.history[0])
-        b = self.site.ground_xz(track.history[-1])
-        span = (len(track.history) - 1) / fps
+        pts = self._window(track)
+        a = self.site.ground_xz(pts[0])
+        b = self.site.ground_xz(pts[-1])
+        span = (len(pts) - 1) / fps
         if span <= 0:
             return 0.0
         return math.hypot(b[0] - a[0], b[1] - a[1]) / span
@@ -226,6 +246,7 @@ class RoadWatch:
 
     def _observe(self, kind: str, track: Track, now_s: float, detail: str) -> None:
         key = (kind, track.track_id)
+        self._fired.add(key)
         ev = self.events.get(key)
         if ev is None:
             self.events[key] = Event(
@@ -242,8 +263,9 @@ class RoadWatch:
         speed = self.ground_speed_ms(track, fps)
         if speed < self.min_speed_ms:
             return          # too slow for a direction to mean anything
-        a = self.site.ground_xz(track.history[0])
-        b = self.site.ground_xz(track.history[-1])
+        pts = self._window(track)
+        a = self.site.ground_xz(pts[0])
+        b = self.site.ground_xz(pts[-1])
         travelled_dz = b[1] - a[1]
         if travelled_dz * self.flow_dz < 0:
             self._observe(WRONG_WAY, track, now_s,
@@ -274,19 +296,22 @@ class RoadWatch:
         it does not perform them. Same split as the governor: the thing that
         decides is not the thing that emits.
         """
-        seen: set[tuple[str, str]] = set()
+        self._fired = set()
         for t in tracks:
             self._check_wrong_way(t, now_s, fps)
             self._check_stopped(t, now_s, fps)
             self._check_person(t, now_s)
-            for kind in (WRONG_WAY, STOPPED_IN_LANE, PERSON_IN_LANE):
-                if (kind, t.track_id) in self.events:
-                    seen.add((kind, t.track_id))
 
-        # Drop events whose condition stopped holding. An event that ends
-        # before it was warned about never happened as far as the road is
-        # concerned - that is what confirm_s is for.
-        for key in [k for k in self.events if k not in seen]:
+        # Drop events whose condition stopped holding.
+        #
+        # This keys on whether the CONDITION fired this frame, not on whether
+        # the track is still visible. An earlier version kept any event whose
+        # track was present, so a car that stopped and then drove away stayed
+        # listed as stopped for as long as it remained in shot - and worse, if
+        # it stopped again later, `last_seen_s` advanced against the original
+        # `first_seen_s`, so the duration jumped straight past the escalation
+        # threshold and put a human on a car that had just braked twice.
+        for key in [k for k in self.events if k not in self._fired]:
             del self.events[key]
 
         warn: list[Event] = []

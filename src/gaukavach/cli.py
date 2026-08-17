@@ -513,6 +513,7 @@ def cmd_video(args) -> int:
     import cv2  # noqa: PLC0415
 
     from .detect import Perception  # noqa: PLC0415
+    from .road import RoadWatch  # noqa: PLC0415
 
     per = Perception(weights=args.weights, conf=args.conf)
     if not per.available:
@@ -529,8 +530,10 @@ def cmd_video(args) -> int:
         EngineConfig(directivity_gain_db=args.directivity, dry_run=True),
     )
     tracker = SimpleTracker()
+    watch = RoadWatch(site=DEMO_SITE, flow_dz=args.flow)
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     idx = 0
+    last_level = None
     print(BANNER)
     print(RULE)
     print(f"Reading {args.path} at {fps:.1f} fps. Detector: {args.weights}")
@@ -552,6 +555,22 @@ def cmd_video(args) -> int:
                 if a["action"] in ("emit", "denied", "escalate", "out_of_range"):
                     detail = a.get("reason", a.get("carrier_khz", ""))
                     print(f"  t={idx / fps:6.2f}s  {a['action']:<13} {detail}")
+
+            # The same tracks, read for the road rather than for the animal.
+            road = watch.step(tracks, idx / fps, fps, idx)
+            crowd = road["crowd"]
+            if crowd["level"] != last_level:
+                last_level = crowd["level"]
+                print(f"  t={idx / fps:6.2f}s  {'crowd':<13} "
+                      f"{crowd['count']} on the carriageway, "
+                      f"{crowd['per_100m2']}/100m2 - {crowd['level']}")
+            for e in road["warn"]:
+                print(f"  t={idx / fps:6.2f}s  {'WARN':<13} "
+                      f"{e['kind']} [{e['track_id']}] {e['detail']}")
+            for i in road["escalate"]:
+                print(f"  t={idx / fps:6.2f}s  {'ESCALATE':<13} "
+                      f"{i['kind']} [{i['track_id']}] held {i['duration_s']}s "
+                      f"-> operator queue, frame {i['evidence_frame']}")
         idx += 1
         if args.max_frames and idx >= args.max_frames:
             break
@@ -560,6 +579,13 @@ def cmd_video(args) -> int:
     print()
     print(f"Frames {idx} | incidents {summary['incidents']} | "
           f"emission {summary['total_emission_s']} s")
+    if watch.incidents:
+        print()
+        print(f"{len(watch.incidents)} road incident(s) queued for an operator.")
+        print("None has been reported to any authority: that step is a person's,")
+        print("and `authority_notified` is a field only a person may set.")
+        for i in watch.incidents:
+            print(f"  frame {i.evidence_frame:<6} {i.kind:<26} {i.detail}")
     print(f"Ledger chain valid: {engine.ledger.verify()['valid']}")
     return 0
 
@@ -810,6 +836,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_render)
 
     s = sub.add_parser("video", help="run real perception on a video file")
+    s.add_argument("--flow", type=float, default=1.0,
+                   help="expected traffic direction: +1 recedes from the camera, "
+                        "-1 approaches. Wrong-way detection is meaningless without it.")
     s.add_argument("path")
     s.add_argument("--weights", default="yolov8n.pt")
     s.add_argument("--conf", type=float, default=0.35)

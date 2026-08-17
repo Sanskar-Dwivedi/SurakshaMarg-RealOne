@@ -28,9 +28,18 @@ Web Serial needs a secure origin. A `file://` page is not one and neither is an
 embedded frame, but `http://127.0.0.1` is — so the page has to be **served**,
 not opened off the disk. That is the only reason the launcher exists.
 
-    cd hardware
-    python -m http.server 8765 --bind 127.0.0.1
-    # then open http://127.0.0.1:8765/bench.html
+    python tools/serve.py
+    # then open http://127.0.0.1:8765/hardware/bench.html
+
+It prints a link to every page. Use it rather than `python -m http.server`:
+that one sends `Last-Modified` and no `Cache-Control`, so a browser may serve
+its cached copy without asking the server at all. These pages are regenerated
+constantly, so the result is that you rebuild, reload, and study the previous
+build. `tools/serve.py` sends `no-store` and withholds `Last-Modified`, so a
+reload always refetches.
+
+Both pages carry a **build stamp** — date, time and commit — so you can see
+which build is on screen instead of guessing.
 
 Click **Connect the board**, choose the ESP32's COM port, then **Run the demo**.
 Chrome or Edge only; Firefox has no Web Serial.

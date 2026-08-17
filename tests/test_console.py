@@ -136,3 +136,27 @@ def test_the_human_veto_is_live_not_latched():
     assert hits > 20, (
         f"the human veto is reported on only {hits} frames - it is latching "
         f"and then falling silent instead of refusing every frame")
+
+
+def test_the_page_carries_a_build_stamp_marker():
+    """
+    'gaukavach sim' stamps the build between these markers. Without them the
+    stamp silently does not happen, and a 6.6 MB page that is rebuilt many
+    times a day gives you no way to tell which build you are looking at - so
+    you reload, see the old one, and debug something you already fixed.
+    """
+    text = TEMPLATE.read_text(encoding="utf-8")
+    assert "<!--BUILD-->" in text and "<!--/BUILD-->" in text, (
+        "the build stamp markers are gone from the template")
+
+
+def test_the_local_server_refuses_to_let_the_browser_cache():
+    """
+    The default 'python -m http.server' sends Last-Modified and nothing else,
+    which lets a browser serve the page from cache without revalidating.
+    """
+    src = (ROOT / "tools" / "serve.py").read_text(encoding="utf-8")
+    assert "no-store" in src, "the local server does not send no-store"
+    assert 'keyword.lower() == "last-modified"' in src, (
+        "the local server still sends Last-Modified, so a reload can be "
+        "answered with 304 from cache")

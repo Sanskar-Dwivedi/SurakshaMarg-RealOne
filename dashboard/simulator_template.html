@@ -46,6 +46,8 @@ header{background:var(--surface);border-bottom:1px solid var(--line);padding:13p
   text-transform:uppercase;color:var(--accent)}
 h1{font-size:19px;letter-spacing:-.01em;line-height:1.2}
 .hdr-note{font-size:11.5px;color:var(--muted);margin-top:3px;max-width:62ch}
+.buildstamp{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;
+  letter-spacing:.06em;color:var(--faint);margin-top:5px}
 .hdrstats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line)}
 .hs{background:var(--surface-2);padding:6px 11px;min-width:84px}
 .hs-k{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;letter-spacing:.07em;
@@ -167,6 +169,10 @@ svg{display:block;width:100%;height:auto}
     <div class="eyebrow">Operations console</div>
     <h1>GauKavach</h1>
     <div class="hdr-note" id="hdrnote"></div>
+    <!-- Which build is on screen. The page is rebuilt constantly and is 6.6 MB,
+         so "did my reload actually get the new one?" is a real question and
+         the page should answer it rather than leave you guessing. -->
+    <div class="buildstamp" id="buildstamp">build <!--BUILD-->not stamped<!--/BUILD--></div>
   </div>
   <div class="hdrstats" id="hdrstats"></div>
   <nav>

@@ -38,6 +38,28 @@ def esc(s) -> str:
     return "".join(c if ord(c) < 128 else f"&#{ord(c)};" for c in t)
 
 
+def build_stamp() -> str:
+    """
+    Which build this page is, without a clock.
+
+    The console stamps a timestamp because it is gitignored and rebuilt many
+    times an hour. This page is tracked, so a timestamp would rewrite a line
+    on every regeneration - churn in every diff, and a one-line conflict
+    hotspot the moment two people regenerate it. The commit plus a dirty flag
+    says the thing that actually matters: which code this came from, and
+    whether it came from code anyone else can see.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(["git", "describe", "--always", "--dirty=+local"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
 def consts() -> dict[str, float]:
     src = ESP.read_text(encoding="utf-8")
     out: dict[str, float] = {}
@@ -324,7 +346,7 @@ figures are in the table below.</p>
 <table><tbody>{limits}</tbody></table>
 </div>
 
-<p class="foot">Regenerate with <code>python tools/make_bench.py</code>.</p>
+<p class="foot">Regenerate with <code>python tools/make_bench.py</code>.<br>build {build}</p>
 </div>
 <script>
 const K = {consts};
@@ -894,7 +916,8 @@ def main() -> None:
         permit=p["LED_PERMIT"], refuse=p["LED_REFUSE"], escalate=p["LED_ESCALATE"],
         armed=p["LED_ARMED"], emit=p["PIN_EMIT"],
         carrier=f"{c['CARRIER_HZ'] / 1000:.0f}", ramp=f"{c['RAMP_MS']:.0f}",
-        maxgroup=f"{c['MAX_GROUP']:.0f}", maxtraffic=f"{c['MAX_TRAFFIC']:.0f}", maxatt=f"{c['MAX_ATTEMPTS']:.0f}",
+        maxgroup=f"{c['MAX_GROUP']:.0f}", maxtraffic=f"{c['MAX_TRAFFIC']:.0f}",
+        build=esc(build_stamp()), maxatt=f"{c['MAX_ATTEMPTS']:.0f}",
         budget=f"{c['DAILY_BUDGET_MS'] / sp / 1000:.0f}", speed=f"{sp:.0f}")
     page = "".join(ch if ord(ch) < 128 else f"&#{ord(ch)};" for ch in page)
 

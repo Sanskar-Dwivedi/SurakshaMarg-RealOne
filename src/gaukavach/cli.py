@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
@@ -581,12 +583,29 @@ def cmd_sim(args) -> int:
     # that has to be carried around by hand.
     page = Path(args.page)
     tmpl = Path(args.template)
-    if not page.exists():
+    # Take the template whenever it is newer than the built page, not only when
+    # the page is missing.
+    #
+    # It used to be "only when missing", which meant every edit to the
+    # template - the code, the part under review - was silently ignored on any
+    # machine that already had a built page. You changed the console, rebuilt,
+    # reloaded, and studied the old code. The page is fully derived from the
+    # template plus the payload files, so there is nothing in it to protect.
+    stale = (tmpl.exists() and page.exists()
+             and tmpl.stat().st_mtime > page.stat().st_mtime)
+    if not page.exists() or stale:
         if not tmpl.exists():
             print(f"  note: neither {page} nor {tmpl} found, wrote JSON only")
             return 0
+        missing = [p for p in ("dashboard/footage.json", "dashboard/outcome.json")
+                   if not Path(p).exists()]
+        if missing and stale:
+            # Rebuilding from the template drops whatever is only in the page.
+            print(f"  WARNING: rebuilding from {tmpl} but {', '.join(missing)} "
+                  f"is missing - those tabs will be empty")
         page.write_text(tmpl.read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"  page         built from {tmpl}")
+        why = "template is newer" if stale else "no page yet"
+        print(f"  page         built from {tmpl}  ({why})")
 
     html = page.read_text(encoding="utf-8")
     end = "</script>"
@@ -608,8 +627,27 @@ def cmd_sim(args) -> int:
                 print(f"  note: {pid:5} has no data ({data_file} missing)")
             continue
         html = html[: i + len(marker)] + data_file.read_text(encoding="utf-8") + html[j:]
+    # Stamp the build. Without it there is no way to tell a freshly rebuilt
+    # 6.6 MB page from the copy the browser kept, and reading yesterday's
+    # verdicts while believing they are today's is the expensive kind of wrong.
+    stamp = time.strftime("%Y-%m-%d %H:%M")
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=5)
+        if sha.returncode == 0 and sha.stdout.strip():
+            stamp += "  " + sha.stdout.strip()
+    except Exception:
+        pass                            # a stamp without a sha still dates it
+    a, b = "<!--BUILD-->", "<!--/BUILD-->"
+    i, j = html.find(a), html.find(b)
+    if i >= 0 and j > i:
+        html = html[: i + len(a)] + stamp + html[j:]
+    else:
+        print("  WARNING: no build stamp marker in the page")
+
     page.write_text(html, encoding="utf-8")
     print(f"  injected     {page}  ({page.stat().st_size / 1048576:.2f} MB)")
+    print(f"  build        {stamp}")
     print()
     print("Open the page in any browser. It is fully self-contained.")
     return 0

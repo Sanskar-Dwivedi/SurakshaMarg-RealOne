@@ -198,8 +198,16 @@ class PolicyEngine:
                     f"{prof.name}"
                     + (" (hears this carrier better than cattle)" if better else "")
                 )
+        # Vehicles were already being classified and then ignored. They are a
+        # veto input: what makes a startle dangerous is not the animal, it is
+        # what the animal might run into.
+        vehicles_in_zone = [
+            t for t in roles["vehicle"]
+            if self.site.classify_position(t.foot_point) != "outside"
+        ]
         scene = SceneContext(
             humans_in_cone=len(humans_in_zone),
+            vehicles_in_zone=len(vehicles_in_zone),
             non_target_animals_in_cone=tuple(nontarget_detail) or nontargets_in_zone,
             sensitive_receptors_nearby=self.cfg.sensitive_receptors_nearby,
         )

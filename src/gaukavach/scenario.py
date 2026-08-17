@@ -131,6 +131,37 @@ register(Scenario(
     duration_s=20.0,
 ))
 
+def _car(start, end, t0, t1) -> Actor:
+    return Actor("car", start, end, t0, t1, box_w=150, box_h=95)
+
+
+register(Scenario(
+    name="traffic-present",
+    description=(
+        "A cow reaches the verge and stops there, while six vehicles queue "
+        "through the zone. Every acoustic precondition is satisfied - single animal, in "
+        "range, clear of the carriageway, budget intact - and the governor "
+        "still refuses, because the emitter startles rather than steers. With "
+        "traffic present, an animal that picks the wrong direction is the "
+        "collision this system exists to prevent. The window for acoustics "
+        "was before the traffic arrived; what is left is the traffic warning, "
+        "which needs no cooperation from the animal."
+    ),
+    actors=[
+        _cow((300, 340), (520, 452), 0.0, 20.0),
+        # A queue, not free-flowing traffic: livestock on the carriageway is
+        # what produces the queue in the first place (see traffic.py), so slow
+        # vehicles beside the animal is the ordinary case, not a contrived one.
+        _car((180, 500), (300, 512), 0.0, 20.0),
+        _car((520, 496), (650, 508), 0.0, 20.0),
+        _car((860, 505), (980, 516), 0.0, 20.0),
+        _car((240, 585), (140, 600), 0.0, 20.0),
+        _car((700, 592), (600, 606), 0.0, 20.0),
+        _car((1040, 640), (930, 660), 0.0, 20.0),
+    ],
+    duration_s=20.0,
+))
+
 register(Scenario(
     name="herd-breakthrough",
     description=(

@@ -28,6 +28,7 @@ from pathlib import Path
 from . import evidence as ev
 from .acoustics import Atmosphere, select_carrier
 from .detect import (
+    COCO_VEHICLE,
     DEMO_SITE,
 
     Site,
@@ -72,7 +73,9 @@ def record_scenario(sc: Scenario, site: Site = DEMO_SITE, atm: Atmosphere = SITE
                 "id": tr.track_id,
                 "l": tr.label,
                 "sp": profiles[0].name if profiles else tr.label,
-                "g": profiles[0].group.value if profiles else "unknown",
+                "g": (profiles[0].group.value if profiles
+                      else "vehicle" if tr.label in COCO_VEHICLE.values()
+                      else "unknown"),
                 "b": [int(v) for v in tr.xyxy],
                 "d": round(site.estimate_distance_m(tr.foot_point), 1),
                 "h": round(site.estimate_height_m(tr.xyxy), 2),
@@ -267,6 +270,7 @@ def export(out_path: str | Path = "dashboard/sim.json", step_px: int = 16) -> di
             "band_lo_khz": ev.get("experimental_band_low_hz") / 1000.0,
             "band_hi_khz": ev.get("experimental_band_high_hz") / 1000.0,
             "max_herd": ev.get("max_herd_size_for_emission"),
+            "max_traffic": ev.get("max_vehicles_in_zone_for_emission"),
             "max_activation_s": ev.get("max_activation_s"),
             "min_silence_s": ev.get("min_silence_s"),
             "daily_budget_s": ev.get("daily_exposure_budget_s"),

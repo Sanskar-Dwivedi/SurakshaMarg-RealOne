@@ -54,6 +54,8 @@ core 3.x, no libraries. Then open the Serial Monitor at **115200** and type:
 | `n`    | dog or goat in the cone, refused                 |
 | `g5`   | herd of five, refused                            |
 | `g1`   | back under the group limit                       |
+| `v6`   | six vehicles in the zone, refused                |
+| `v0`   | clear road again                                 |
 | `d20`  | already at the carriageway, refused              |
 | `d160` | beyond the acoustic envelope, refused            |
 | `e`    | emergency stop, latched                          |

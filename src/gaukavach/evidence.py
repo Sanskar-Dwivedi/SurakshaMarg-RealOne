@@ -505,6 +505,19 @@ declare(Constant(
     ("welfare", "herd", "stampede")))
 
 declare(Constant(
+    "max_vehicles_in_zone_for_emission", 3, "vehicles", Grade.HEURISTIC, ("OURS",),
+    "Above this many vehicles inside the warning zone, emission is refused and "
+    "the incident is handled as a traffic-warning problem instead. Rationale: "
+    "the emitter startles, it does not steer - the animal chooses its own "
+    "direction, and R9's social facilitation makes that choice less "
+    "predictable, not more. With a clear road a wrong choice costs nothing; "
+    "with vehicles present a wrong choice is the collision this system exists "
+    "to prevent, now caused by the system. The acoustic window is therefore "
+    "before the traffic arrives. The threshold itself is ours and is a site "
+    "parameter, not a finding.",
+    ("welfare", "hazard", "traffic")))
+
+declare(Constant(
     "herd_grouping_radius_m", 12.0, "m", Grade.HEURISTIC, ("OURS",),
     "Animals of the same species within this distance of each other are "
     "counted as one social group for the stampede check.",

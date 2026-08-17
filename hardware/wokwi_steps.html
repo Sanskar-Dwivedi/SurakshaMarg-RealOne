@@ -177,6 +177,103 @@ const int BTN_ESTOP     = 35;   // input-only pin, needs an external pull-up
  * an output only, which is the standard and safe use of it. */
 const int POT_GROUP     = 34;   // ADC1, input-only
 
+/* ------------- what is actually fitted -------------
+ * Set to 0 when no potentiometer is on the board.
+ *
+ * This matters more than it looks. GPIO34 is input-only with no internal pull
+ * anywhere in the silicon, so an unfitted pot does not read zero - it floats,
+ * and the governor sees a herd size that wanders between 1 and 8 on its own.
+ * Every refusal it then produces is real, correctly reasoned, and based on a
+ * number nobody chose. That is the worst failure this rig can have, because
+ * it looks exactly like the system working.
+ *
+ * With HAVE_POT 0 the pin is never read. Group size comes from the serial
+ * console instead: type g5 and press enter. Say so when you demo it.
+ */
+#define HAVE_POT 0
+
+/* Set to 0 when the E-stop button is not fitted, or is wired in a way that
+ * reads permanently closed. Two legs on the same side of a tactile switch are
+ * already joined inside it, so that mistake grounds the pin forever and the
+ * governor is inhibited from the moment it boots.
+ *
+ * Turning this off does NOT remove the emergency stop - the console &#x27;e&#x27;
+ * command still latches it, and every other veto is untouched. It removes a
+ * pin that is lying. But the rig must then never be described as having a
+ * wired safety interlock, so it says so at boot, every boot. */
+#define HAVE_ESTOP 0
+
+/* Set to 0 when no HC-SR04 is fitted or it returns no echo. Distance then
+ * comes from the console: type d80 for 80 cm. The governor cannot tell the
+ * difference, because it only ever sees a distance - which is exactly why you
+ * have to say out loud that the distance input is being typed.
+ *
+ * Now 1: on 5 V from VIN through a rail, with the 1k/2k divider restored, the
+ * module answers 344 of 355 pings across 16-105 cm. It had been silent on 3.3 V
+ * while still holding ECHO low - powered enough to drive the line, not enough
+ * to fire the transmitter. Distance is sensed again; only the group size and
+ * the emergency stop remain typed. */
+#define HAVE_SENSOR 1
+
+/* Two colours carry the four states, with escalation blinking rather than
+ * owning a third colour. All three lamps on this rig now work - see
+ * FAR_LAMP_MODE below, which gives the third one a job of its own. */
+#define TWO_LAMP_MODE 1
+
+/* Set to 1 when exactly one status LED works. Not the case here any more; kept
+ * because a rig can always lose a lamp an hour before it is needed.
+ *
+ * One lamp still carries three states, by rate rather than by colour: solid
+ * while emitting, a slow pulse while refusing, a fast flutter once it has
+ * given up and asked for a human. Dark means nothing is there.
+ *
+ * Solid-for-emitting is the right way round. This lamp is off almost all of
+ * the time, and that is the argument, not a limitation of it. */
+#define ONE_LAMP_MODE 0
+#if TWO_LAMP_MODE || ONE_LAMP_MODE
+/* Measured with count_lamp, each pin blinking its own number: green on GPIO14,
+ * red on GPIO27, and yellow on GPIO26 once it was wired.
+ *
+ * Worth recording why that took so long. The first mapping was taken while
+ * GPIO26 and GPIO27 were shorted together in one breadboard column, so driving
+ * either lit the single LED that existed, and GPIO26 looked like the red lamp.
+ * Once the short was fixed that reading was false, and every later test drove a
+ * pin with nothing on it. Measurements taken through a fault do not survive the
+ * fix - re-measure after every repair, including this comment. */
+const int LAMP_GO   = 14;      // green: permitted
+const int LAMP_STOP = 27;      // red: refused, and blinking for escalated
+const int LAMP_ONE  = 14;
+#endif
+
+/* A third lamp for one refusal in particular: the target is out of acoustic
+ * range. Set to 0 if nothing is wired to GPIO26.
+ *
+ * Worth its own light because it is the one refusal that is about geometry
+ * rather than about the animal. Lit, the three lamps read as a map - red too
+ * close, green in range, this one too far - so moving a hand through the
+ * detection cone tells the whole spatial story without a word of narration.
+ *
+ * The other four refusals share the red lamp. They are about who or what is
+ * there, not where. */
+/* A short audible chirp at the start of every emission.
+ *
+ * The carrier is 25 kHz and nobody in the room can hear it, so without this
+ * the emitter contributes nothing an audience can perceive. The chirp is a
+ * MARKER, not the carrier: 120 ms at 2.2 kHz, then the real 25 kHz burst runs
+ * for its full length underneath.
+ *
+ * This is a demo affordance and has to be described as one. Saying &quot;that beep
+ * is the ultrasound&quot; would be the one dishonest sentence in the whole project.
+ * The boot banner declares it, and the right line is: the chirp tells you when
+ * it emitted; what it actually emits, you cannot hear. */
+#define AUDIBLE_MARKER 1
+const uint32_t MARKER_HZ = 2200;
+const uint16_t MARKER_MS = 120;
+
+#define FAR_LAMP_MODE 1
+const int LAMP_FAR = 26;      // yellow on this rig
+bool farRefusal = false;
+
 /* ---------------- LEDC ---------------- */
 const int      LEDC_CH   = 0;
 const int      LEDC_RES  = 8;          // 8-bit duty, 0..255
@@ -186,6 +283,20 @@ const uint16_t RAMP_MS   = 25;         // raised-cosine rise and fall
 
 /* ------------- governor limits, mirroring evidence.py ------------- */
 const uint8_t  MAX_GROUP         = 3;
+/* Vehicles in the zone above which a startle is not permitted.
+ *
+ * This rule refuses at exactly the moment a collision is possible, which reads
+ * backwards, so it is worth writing down why. The emitter does not steer an
+ * animal, it startles one, and a startled animal chooses its own direction.
+ * On a clear road that gamble is cheap - the worst case is an animal moving
+ * the wrong way across empty tarmac. With vehicles present the worst case is
+ * an animal bolting into one, and the system has then caused the collision it
+ * exists to prevent.
+ *
+ * The window for acoustics is therefore BEFORE the traffic arrives. Once that
+ * window has closed the useful output is the traffic warning, which needs no
+ * cooperation from the animal, not a louder attempt at the animal. */
+const uint8_t  MAX_TRAFFIC       = 3;
 const uint32_t MAX_ACTIVATION_MS = 6000;
 const uint32_t MIN_SILENCE_MS    = 20000;
 const uint32_t DAILY_BUDGET_MS   = 120000;
@@ -195,10 +306,28 @@ const uint8_t  MAX_ATTEMPTS      = 3;
  * by this and the true values are printed at boot - the compression is stated,
  * not hidden. Set to 4, not 10: at 10x, escalation fires 2.5 s after detection,
  * which is quicker than you can reach for a button, so every veto you try to
- * demonstrate has already gone to amber. Verified in the simulator. */
-const uint16_t DEMO_SPEED        = 4;
+ * demonstrate has already gone to amber. Verified in the simulator.
+ *
+ * Lowered from 4 to 2 after watching someone use it. Compression shortens the
+ * permitted burst as much as the waiting, and the burst is the only part that
+ * is visible - at 4x it lasted 1.5 s and the rig looked like it only ever
+ * refused. At 2x it is three seconds, which reads. The waits grow too, but
+ * nobody is watching those. */
+const uint16_t DEMO_SPEED        = 2;
 
-const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
+/* One centimetre on the bench is one metre of field range. Chosen for the
+ * demo rather than derived: at the old 2.8 the permit band sat between 34 and
+ * 120 cm, which is a metre of desk and further than anyone naturally holds a
+ * hand, so the rig looked like it only ever refused. At 1.0 the whole thing
+ * fits inside arm&#x27;s reach and the arithmetic is something you can say out loud
+ * while it happens. */
+const float DESK_SCALE  = 1.0;    // cm on the bench per metre of field range
+
+/* Beyond this the bench sees nothing at all, rather than seeing something and
+ * refusing it for being out of range. Without it a wall across the room is a
+ * permanent detection the governor keeps declining, and the log fills with
+ * refusals nobody caused. */
+const float SEEN_MAX_CM = 70.0;
 const float RANGE_MAX_M = 42.8;
 const float LINE_M      = 12.0;
 
@@ -218,15 +347,22 @@ uint32_t scaled(uint32_t ms) { return ms / DEMO_SPEED; }
 #if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
 static inline void emitAttach()            { ledcAttach(PIN_EMIT, CARRIER_HZ, LEDC_RES); }
 static inline void emitDuty(uint32_t duty) { ledcWrite(PIN_EMIT, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(PIN_EMIT, hz); }
 #else
 static inline void emitAttach() {
   ledcSetup(LEDC_CH, CARRIER_HZ, LEDC_RES);
   ledcAttachPin(PIN_EMIT, LEDC_CH);
 }
 static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(LEDC_CH, hz); }
 #endif
 
 void emitStop();
+float pingOnceCm();
+void selfCheck();
+void consoleHelp();
+void consoleTick();
+void consoleRun(char *, uint8_t);
 
 /* ---------------- input conditioning ----------------
  *
@@ -250,6 +386,7 @@ const uint8_t DEBOUNCE_PASSES = 4;
 const uint8_t GROUP_PASSES    = 3;
 const uint8_t ADC_SAMPLES     = 16;
 const uint8_t PING_GAP_MS     = 10;   // let the previous burst die down
+const uint8_t CONSOLE_IDLE_MS = 80;   // dispatch a command with no terminator
 
 const uint8_t B_PERSON = 0, B_NONTARGET = 1, B_ESTOP = 2, B_COUNT = 3;
 int     btnPin[B_COUNT];
@@ -266,8 +403,12 @@ bool pressed(uint8_t i) {
 }
 
 uint8_t groupStable = 1;
+uint8_t groupTyped  = 1;        // used when no pot is fitted
 
 uint8_t readGroup() {
+#if !HAVE_POT
+  return groupTyped;
+#else
   uint32_t acc = 0;
   for (uint8_t i = 0; i &lt; ADC_SAMPLES; i++) acc += analogRead(POT_GROUP);
   long    span = map((long)(acc / ADC_SAMPLES), 0L, 4095L, 1L, 8L);
@@ -278,6 +419,151 @@ uint8_t readGroup() {
   else if (agree &lt; GROUP_PASSES) { agree++; }
   if (agree &gt;= GROUP_PASSES) groupStable = candidate;
   return groupStable;
+#endif
+}
+
+/* ---------------- serial console ----------------
+ *
+ * Every physical input has a keyboard equivalent, for two reasons. A rig gets
+ * built with parts that did not arrive, and a rig gets demonstrated in a room
+ * where a jumper has shaken loose. Neither should cost you the argument, and
+ * the argument is the refusals.
+ *
+ * Typing a veto is not the same claim as pressing one, so the console says
+ * which it was in the log. Do not narrate a typed veto as a wired one.
+ */
+bool  typedPerson = false, typedNonTarget = false;
+uint8_t vehicles = 0;        // vehicles in the zone, typed with v0..v9
+float simDistanceCm = 999.0f;
+
+/* A typed distance overrides the sensor until the next reset.
+ *
+ * Without this, enabling the sensor silently disabled the console&#x27;s d command:
+ * it was still accepted and still acknowledged, and the governor went on
+ * reading the sensor. Anything driving the board over USB - the web bench, for
+ * instance - would appear to do nothing, while the log insisted the distance
+ * had been set. An input that reports success and changes nothing is worse
+ * than one that is missing.
+ *
+ * Cleared by r, so &#x27;r&#x27; means &quot;go back to trusting the sensor&quot;. */
+bool  distanceOverride = false;
+
+void consoleHelp() {
+  Serial.println(&quot;console: g1..g8 group size | p person veto | n dog/goat veto&quot;);
+  Serial.println(&quot;         v0..v9 vehicles in the zone, e.g. v5 -&gt; refused&quot;);
+  Serial.println(&quot;         e e-stop | r clear latches | ? this help&quot;);
+#if HAVE_SENSOR
+  Serial.println(&quot;         d0..d400 overrides the sensor until r, e.g. d25&quot;);
+#else
+  Serial.println(&quot;         d0..d400 distance in cm, e.g. d25 -&gt; permitted&quot;);
+#endif
+#if !HAVE_POT
+  Serial.println(&quot;         no pot fitted, so group size comes from g1..g8&quot;);
+#endif
+}
+
+void consoleRun(char *line, uint8_t len) {
+  char cmd = line[0];
+  long arg = (len &gt; 1) ? atol(line + 1) : -1;
+
+  if (cmd == &#x27;g&#x27;) {
+    if (arg &gt;= 1 &amp;&amp; arg &lt;= 8) {
+      groupTyped = (uint8_t)arg;
+      Serial.printf(&quot;console: group size set to %u\n&quot;, groupTyped);
+    } else {
+      Serial.println(&quot;console: group size must be 1 to 8, e.g. g5&quot;);
+    }
+  } else if (cmd == &#x27;d&#x27;) {
+    if (arg &gt;= 0 &amp;&amp; arg &lt;= 400) {
+      simDistanceCm = (float)arg;
+      distanceOverride = true;          // stop reading the sensor until r
+      Serial.printf(&quot;console: distance set to %ld cm (%.1f m scaled)\n&quot;,
+                    arg, arg / DESK_SCALE);
+    } else {
+      Serial.println(&quot;console: distance must be 0 to 400 cm, e.g. d80&quot;);
+    }
+  } else if (cmd == &#x27;v&#x27;) {
+    if (arg &gt;= 0 &amp;&amp; arg &lt;= 9) {
+      vehicles = (uint8_t)arg;
+      Serial.printf(&quot;console: %u vehicle(s) in the zone%s\n&quot;, (unsigned)vehicles,
+                    vehicles &gt; MAX_TRAFFIC ? &quot; - over the limit&quot; : &quot;&quot;);
+    } else {
+      Serial.println(&quot;console: vehicles must be 0 to 9, e.g. v5&quot;);
+    }
+  } else if (cmd == &#x27;p&#x27;) {
+    typedPerson = !typedPerson;
+    Serial.printf(&quot;console: PERSON veto %s (typed, not wired)\n&quot;,
+                  typedPerson ? &quot;on&quot; : &quot;off&quot;);
+  } else if (cmd == &#x27;n&#x27;) {
+    typedNonTarget = !typedNonTarget;
+    Serial.printf(&quot;console: DOG/GOAT veto %s (typed, not wired)\n&quot;,
+                  typedNonTarget ? &quot;on&quot; : &quot;off&quot;);
+  } else if (cmd == &#x27;e&#x27;) {
+    estopLatched = true;
+    Serial.println(&quot;console: E-STOP asserted&quot;);
+  } else if (cmd == &#x27;r&#x27;) {
+    /* Clear the typed vetoes too.
+     *
+     * They are toggles, so anything driving this console - a person or the web
+     * page - has no way to read their state, only to flip them. A reset that
+     * leaves them set means the driver&#x27;s model and the board disagree from the
+     * first command onward, and every later toggle stays inverted. Reset has
+     * to mean reset, or it is just another source of drift. */
+    estopLatched = false;
+    doNotEmit = false;
+    typedPerson = false;
+    typedNonTarget = false;
+    vehicles = 0;
+    distanceOverride = false;      // back to the sensor
+    exposureUsedMs = 0;
+    state = IDLE;
+    attempts = 0;
+    incidentStart = 0;
+    Serial.println(&quot;console: latches cleared&quot;);
+  } else if (cmd == &#x27;?&#x27;) {
+    consoleHelp();
+  } else {
+    Serial.printf(&quot;console: unknown command &#x27;%s&#x27;, try ?\n&quot;, line);
+  }
+}
+
+void consoleTick() {
+  /* Two ways a command gets here, because the Serial Monitor has a line-ending
+   * dropdown and it is not the operator&#x27;s job to know about it.
+   *
+   * Set to &quot;New Line&quot; it sends p\n and the newline dispatches. Set to &quot;No Line
+   * Ending&quot; it sends a bare p and nothing follows, so a parser that waits for a
+   * terminator waits forever and the console looks broken. That is a real
+   * regression I shipped: character-by-character parsing handled the bare p,
+   * line buffering did not.
+   *
+   * So: dispatch on the newline if one arrives, and otherwise on a short
+   * silence. A human cannot type two commands 80 ms apart, and the monitor
+   * sends a whole line in one burst, so the silence is unambiguous. */
+  static char line[24];
+  static uint8_t n = 0;
+  static uint32_t lastChar = 0;
+
+  while (Serial.available() &gt; 0) {
+    int c = Serial.read();
+    lastChar = millis();
+    if (c == &#x27;\r&#x27;) continue;
+    if (c != &#x27;\n&#x27;) {
+      if (n &lt; sizeof(line) - 1) line[n++] = (char)c;
+      continue;
+    }
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    if (len &gt; 0) consoleRun(line, len);
+  }
+
+  if (n &gt; 0 &amp;&amp; (millis() - lastChar) &gt; CONSOLE_IDLE_MS) {
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    consoleRun(line, len);
+  }
 }
 
 void setup() {
@@ -311,8 +597,101 @@ void setup() {
   Serial.printf(&quot;daily budget     %.1f s   (demo %.1f s)\n&quot;,
                 DAILY_BUDGET_MS / 1000.0, scaled(DAILY_BUDGET_MS) / 1000.0);
   Serial.printf(&quot;max group        %d\n&quot;, MAX_GROUP);
+  Serial.printf(&quot;max traffic      %d vehicles in the zone\n&quot;, MAX_TRAFFIC);
   Serial.println(&quot;timers compressed for the demo; shipped values shown first&quot;);
   Serial.println(&quot;NO calibrated mic attached: this rig makes no dB claim&quot;);
+  Serial.println();
+  selfCheck();
+  consoleHelp();
+  Serial.println();
+}
+
+/* Power-on self check.
+ *
+ * A governor made of refusals cannot tell you it is miswired: a floating
+ * E-stop latches, a dead sensor reads as &quot;nothing there&quot;, and both look
+ * exactly like the system working correctly and declining to emit. Every
+ * silent failure mode in this rig presents as a deliberate refusal, so the
+ * inputs get examined once at boot, before the logic can hide behind them. */
+void selfCheck() {
+  Serial.println(&quot;power-on self check&quot;);
+
+#if HAVE_ESTOP
+  uint8_t lows = 0;
+  for (uint8_t i = 0; i &lt; 40; i++) {
+    if (digitalRead(BTN_ESTOP) == LOW) lows++;
+    delay(5);
+  }
+  if (lows == 0) {
+    Serial.println(&quot;  E-stop input    OK, held high&quot;);
+  } else if (lows == 40) {
+    Serial.println(&quot;  E-stop input    STUCK LOW - button held closed, or both its &quot;
+                   &quot;wires are on the same side of the switch&quot;);
+  } else {
+    Serial.printf(&quot;  E-stop input    FLOATING (%u of 40 samples low) - the 10k &quot;
+                  &quot;pull-up to 3V3 is not connected\n&quot;, lows);
+  }
+#else
+  const uint8_t lows = 0;
+  Serial.println(&quot;  E-stop input    NOT FITTED - the wired stop is disabled; &quot;
+                 &quot;console &#x27;e&#x27; still latches&quot;);
+#endif
+
+#if HAVE_SENSOR
+  uint8_t echoes = 0;
+  for (uint8_t i = 0; i &lt; 5; i++) {
+    if (pingOnceCm() &gt; 0) echoes++;
+    delay(60);
+  }
+  if (echoes &gt; 0) {
+    Serial.printf(&quot;  distance sensor OK, %u of 5 pings returned\n&quot;, echoes);
+  } else {
+    Serial.println(&quot;  distance sensor NO ECHO - check VCC is on VIN/5V not 3V3, &quot;
+                   &quot;and that TRIG and ECHO are not swapped&quot;);
+  }
+#else
+  const uint8_t echoes = 1;
+  Serial.println(&quot;  distance sensor NOT FITTED - distance comes from the &quot;
+                 &quot;console, type d80&quot;);
+#endif
+
+#if !HAVE_POT
+  Serial.println(&quot;  group knob      NOT FITTED - group size comes from the &quot;
+                 &quot;console, type g5&quot;);
+#else
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i &lt; 16; i++) acc += analogRead(POT_GROUP);
+  Serial.printf(&quot;  group knob      reads %lu of 4095\n&quot;,
+                (unsigned long)(acc / 16));
+#endif
+
+  if (lows &gt; 0 || echoes == 0) {
+    Serial.println(&quot;  ^ fix the above before reading anything into a refusal&quot;);
+  }
+#if !HAVE_ESTOP || !HAVE_SENSOR || !HAVE_POT
+  Serial.println();
+  Serial.println(&quot;  DECLARE THIS WHEN YOU DEMONSTRATE:&quot;);
+#if !HAVE_SENSOR
+  Serial.println(&quot;    the distance input is typed, not sensed&quot;);
+#endif
+#if !HAVE_POT
+  Serial.println(&quot;    the group size is typed, not read from a knob&quot;);
+#endif
+#if !HAVE_ESTOP
+  Serial.println(&quot;    the emergency stop is a console command, not a wired button&quot;);
+#endif
+#if ONE_LAMP_MODE
+  Serial.println(&quot;    one lamp, not three: solid means emitting, a slow pulse &quot;
+                 &quot;means refused, a fast flutter means it gave up&quot;);
+#elif TWO_LAMP_MODE &amp;&amp; FAR_LAMP_MODE
+  Serial.println(&quot;    lamps: green permits, red refuses, red blinking is &quot;
+                 &quot;escalation, yellow is out of acoustic range&quot;);
+#elif TWO_LAMP_MODE
+  Serial.println(&quot;    two lamps, not three: green permits, red refuses, &quot;
+                 &quot;red blinking is escalation&quot;);
+#endif
+  Serial.println(&quot;    the governor rules below are unchanged and are doing the deciding&quot;);
+#endif
   Serial.println();
 }
 
@@ -320,6 +699,14 @@ void setup() {
  * nothing else needs servicing during a 25 ms envelope, and it keeps the shape
  * identical to emitter.py rather than approximated by a scheduler. */
 void emitStart() {
+#if AUDIBLE_MARKER
+  /* Marker first, then the real carrier. Deliberately before the ramp, so the
+   * envelope that follows is untouched by it. */
+  emitTone(MARKER_HZ);
+  delay(MARKER_MS);
+  emitTone(0);
+  emitAttach();                 // back to CARRIER_HZ after the tone changed it
+#endif
   for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
     float x = (float)t / RAMP_MS;                 // 0..1
     float e = 0.5f * (1.0f - cosf(PI * x));       // raised cosine
@@ -375,11 +762,43 @@ float readRangeCm() {
   return a + b + c - hi - lo;
 }
 
+#if ONE_LAMP_MODE
+/* One lamp, three states, told apart by rate. */
+void leds(bool p, bool r, bool e) {
+  uint32_t ms = millis();
+  bool on;
+  if (p)      on = true;                        // emitting: solid
+  else if (e) on = ((ms / 120) % 2) == 0;       // escalated: fast flutter
+  else if (r) on = ((ms / 500) % 2) == 0;       // refusing: slow pulse
+  else        on = false;                       // nothing detected
+  digitalWrite(LAMP_ONE, on);
+}
+#elif TWO_LAMP_MODE
+/* Two working lamps instead of three.
+ *
+ * Three states, two lights, so escalation has to be distinguishable from a
+ * refusal by something other than colour: it blinks. */
+void leds(bool p, bool r, bool e) {
+  digitalWrite(LAMP_GO, p);
+  bool blink = ((millis() / 250) % 2) == 0;
+#if FAR_LAMP_MODE
+  /* A range refusal lights yellow and only yellow. Sharing red would leave the
+   * three zones as two colours, and the point of the third lamp is that the
+   * distance reads without narration: red too close, green in range, yellow
+   * too far. Escalation still owns blinking red, whatever the reason was. */
+  digitalWrite(LAMP_STOP, e ? blink : (r &amp;&amp; !farRefusal));
+  digitalWrite(LAMP_FAR, farRefusal &amp;&amp; !e);
+#else
+  digitalWrite(LAMP_STOP, e ? blink : r);
+#endif
+}
+#else
 void leds(bool p, bool r, bool e) {
   digitalWrite(LED_PERMIT, p);
   digitalWrite(LED_REFUSE, r);
   digitalWrite(LED_ESCALATE, e);
 }
+#endif
 
 void loop() {
   uint32_t now = millis();
@@ -389,11 +808,15 @@ void loop() {
    * a veto button already held down when the animal walks in would need four
    * more passes to be believed, and the governor would permit emission in the
    * gap. Safety inputs must be settled before they are needed, not after. */
-  bool person    = pressed(B_PERSON);
-  bool nonTarget = pressed(B_NONTARGET);
+  consoleTick();
+  farRefusal = false;          // set below only by the out-of-range refusal
+  bool person    = pressed(B_PERSON)    || typedPerson;
+  bool nonTarget = pressed(B_NONTARGET) || typedNonTarget;
   uint8_t group  = readGroup();
 
+#if HAVE_ESTOP
   if (pressed(B_ESTOP)) estopLatched = true;
+#endif
   if (estopLatched) {
     emitStop(&quot;E-STOP&quot;);
     state = INHIBITED;
@@ -408,8 +831,12 @@ void loop() {
 
   if (now - lastBeat &gt; 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
 
-  float cm = readRangeCm();
-  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; 200);
+#if HAVE_SENSOR
+  float cm = distanceOverride ? simDistanceCm : readRangeCm();
+#else
+  float cm = simDistanceCm;
+#endif
+  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; SEEN_MAX_CM);
   float metres = seen ? (cm / DESK_SCALE) : 999.0f;
 
   if (state == EMITTING &amp;&amp; (now - emitStartedAt) &gt;= scaled(MAX_ACTIVATION_MS)) {
@@ -435,7 +862,9 @@ void loop() {
   else if (person)                   deny = &quot;a person is inside the exposure cone&quot;;
   else if (nonTarget)                deny = &quot;a non-target species is inside the cone&quot;;
   else if (group &gt; MAX_GROUP)        deny = &quot;group large enough that a startle could cascade&quot;;
-  else if (metres &gt; RANGE_MAX_M)     deny = &quot;beyond the acoustic envelope&quot;;
+  else if (metres &gt; RANGE_MAX_M)   { deny = &quot;beyond the acoustic envelope&quot;;
+                                     farRefusal = true; }
+  else if (vehicles &gt; MAX_TRAFFIC)   deny = &quot;traffic in the zone - a startled animal could bolt into it&quot;;
   else if (metres &lt;= LINE_M)         deny = &quot;already at the carriageway - fleeing would cross it&quot;;
   else if (state == COOLDOWN &amp;&amp;
            (now - lastEmissionEnd) &lt; scaled(MIN_SILENCE_MS))
@@ -630,6 +1059,103 @@ const int BTN_ESTOP     = 35;   // input-only pin, needs an external pull-up
  * an output only, which is the standard and safe use of it. */
 const int POT_GROUP     = 34;   // ADC1, input-only
 
+/* ------------- what is actually fitted -------------
+ * Set to 0 when no potentiometer is on the board.
+ *
+ * This matters more than it looks. GPIO34 is input-only with no internal pull
+ * anywhere in the silicon, so an unfitted pot does not read zero - it floats,
+ * and the governor sees a herd size that wanders between 1 and 8 on its own.
+ * Every refusal it then produces is real, correctly reasoned, and based on a
+ * number nobody chose. That is the worst failure this rig can have, because
+ * it looks exactly like the system working.
+ *
+ * With HAVE_POT 0 the pin is never read. Group size comes from the serial
+ * console instead: type g5 and press enter. Say so when you demo it.
+ */
+#define HAVE_POT 0
+
+/* Set to 0 when the E-stop button is not fitted, or is wired in a way that
+ * reads permanently closed. Two legs on the same side of a tactile switch are
+ * already joined inside it, so that mistake grounds the pin forever and the
+ * governor is inhibited from the moment it boots.
+ *
+ * Turning this off does NOT remove the emergency stop - the console &#x27;e&#x27;
+ * command still latches it, and every other veto is untouched. It removes a
+ * pin that is lying. But the rig must then never be described as having a
+ * wired safety interlock, so it says so at boot, every boot. */
+#define HAVE_ESTOP 0
+
+/* Set to 0 when no HC-SR04 is fitted or it returns no echo. Distance then
+ * comes from the console: type d80 for 80 cm. The governor cannot tell the
+ * difference, because it only ever sees a distance - which is exactly why you
+ * have to say out loud that the distance input is being typed.
+ *
+ * Now 1: on 5 V from VIN through a rail, with the 1k/2k divider restored, the
+ * module answers 344 of 355 pings across 16-105 cm. It had been silent on 3.3 V
+ * while still holding ECHO low - powered enough to drive the line, not enough
+ * to fire the transmitter. Distance is sensed again; only the group size and
+ * the emergency stop remain typed. */
+#define HAVE_SENSOR 1
+
+/* Two colours carry the four states, with escalation blinking rather than
+ * owning a third colour. All three lamps on this rig now work - see
+ * FAR_LAMP_MODE below, which gives the third one a job of its own. */
+#define TWO_LAMP_MODE 1
+
+/* Set to 1 when exactly one status LED works. Not the case here any more; kept
+ * because a rig can always lose a lamp an hour before it is needed.
+ *
+ * One lamp still carries three states, by rate rather than by colour: solid
+ * while emitting, a slow pulse while refusing, a fast flutter once it has
+ * given up and asked for a human. Dark means nothing is there.
+ *
+ * Solid-for-emitting is the right way round. This lamp is off almost all of
+ * the time, and that is the argument, not a limitation of it. */
+#define ONE_LAMP_MODE 0
+#if TWO_LAMP_MODE || ONE_LAMP_MODE
+/* Measured with count_lamp, each pin blinking its own number: green on GPIO14,
+ * red on GPIO27, and yellow on GPIO26 once it was wired.
+ *
+ * Worth recording why that took so long. The first mapping was taken while
+ * GPIO26 and GPIO27 were shorted together in one breadboard column, so driving
+ * either lit the single LED that existed, and GPIO26 looked like the red lamp.
+ * Once the short was fixed that reading was false, and every later test drove a
+ * pin with nothing on it. Measurements taken through a fault do not survive the
+ * fix - re-measure after every repair, including this comment. */
+const int LAMP_GO   = 14;      // green: permitted
+const int LAMP_STOP = 27;      // red: refused, and blinking for escalated
+const int LAMP_ONE  = 14;
+#endif
+
+/* A third lamp for one refusal in particular: the target is out of acoustic
+ * range. Set to 0 if nothing is wired to GPIO26.
+ *
+ * Worth its own light because it is the one refusal that is about geometry
+ * rather than about the animal. Lit, the three lamps read as a map - red too
+ * close, green in range, this one too far - so moving a hand through the
+ * detection cone tells the whole spatial story without a word of narration.
+ *
+ * The other four refusals share the red lamp. They are about who or what is
+ * there, not where. */
+/* A short audible chirp at the start of every emission.
+ *
+ * The carrier is 25 kHz and nobody in the room can hear it, so without this
+ * the emitter contributes nothing an audience can perceive. The chirp is a
+ * MARKER, not the carrier: 120 ms at 2.2 kHz, then the real 25 kHz burst runs
+ * for its full length underneath.
+ *
+ * This is a demo affordance and has to be described as one. Saying &quot;that beep
+ * is the ultrasound&quot; would be the one dishonest sentence in the whole project.
+ * The boot banner declares it, and the right line is: the chirp tells you when
+ * it emitted; what it actually emits, you cannot hear. */
+#define AUDIBLE_MARKER 1
+const uint32_t MARKER_HZ = 2200;
+const uint16_t MARKER_MS = 120;
+
+#define FAR_LAMP_MODE 1
+const int LAMP_FAR = 26;      // yellow on this rig
+bool farRefusal = false;
+
 /* ---------------- LEDC ---------------- */
 const int      LEDC_CH   = 0;
 const int      LEDC_RES  = 8;          // 8-bit duty, 0..255
@@ -639,6 +1165,20 @@ const uint16_t RAMP_MS   = 25;         // raised-cosine rise and fall
 
 /* ------------- governor limits, mirroring evidence.py ------------- */
 const uint8_t  MAX_GROUP         = 3;
+/* Vehicles in the zone above which a startle is not permitted.
+ *
+ * This rule refuses at exactly the moment a collision is possible, which reads
+ * backwards, so it is worth writing down why. The emitter does not steer an
+ * animal, it startles one, and a startled animal chooses its own direction.
+ * On a clear road that gamble is cheap - the worst case is an animal moving
+ * the wrong way across empty tarmac. With vehicles present the worst case is
+ * an animal bolting into one, and the system has then caused the collision it
+ * exists to prevent.
+ *
+ * The window for acoustics is therefore BEFORE the traffic arrives. Once that
+ * window has closed the useful output is the traffic warning, which needs no
+ * cooperation from the animal, not a louder attempt at the animal. */
+const uint8_t  MAX_TRAFFIC       = 3;
 const uint32_t MAX_ACTIVATION_MS = 6000;
 const uint32_t MIN_SILENCE_MS    = 20000;
 const uint32_t DAILY_BUDGET_MS   = 120000;
@@ -648,10 +1188,28 @@ const uint8_t  MAX_ATTEMPTS      = 3;
  * by this and the true values are printed at boot - the compression is stated,
  * not hidden. Set to 4, not 10: at 10x, escalation fires 2.5 s after detection,
  * which is quicker than you can reach for a button, so every veto you try to
- * demonstrate has already gone to amber. Verified in the simulator. */
-const uint16_t DEMO_SPEED        = 4;
+ * demonstrate has already gone to amber. Verified in the simulator.
+ *
+ * Lowered from 4 to 2 after watching someone use it. Compression shortens the
+ * permitted burst as much as the waiting, and the burst is the only part that
+ * is visible - at 4x it lasted 1.5 s and the rig looked like it only ever
+ * refused. At 2x it is three seconds, which reads. The waits grow too, but
+ * nobody is watching those. */
+const uint16_t DEMO_SPEED        = 2;
 
-const float DESK_SCALE  = 2.8;    // cm on the bench per metre of field range
+/* One centimetre on the bench is one metre of field range. Chosen for the
+ * demo rather than derived: at the old 2.8 the permit band sat between 34 and
+ * 120 cm, which is a metre of desk and further than anyone naturally holds a
+ * hand, so the rig looked like it only ever refused. At 1.0 the whole thing
+ * fits inside arm&#x27;s reach and the arithmetic is something you can say out loud
+ * while it happens. */
+const float DESK_SCALE  = 1.0;    // cm on the bench per metre of field range
+
+/* Beyond this the bench sees nothing at all, rather than seeing something and
+ * refusing it for being out of range. Without it a wall across the room is a
+ * permanent detection the governor keeps declining, and the log fills with
+ * refusals nobody caused. */
+const float SEEN_MAX_CM = 70.0;
 const float RANGE_MAX_M = 42.8;
 const float LINE_M      = 12.0;
 
@@ -671,15 +1229,22 @@ uint32_t scaled(uint32_t ms) { return ms / DEMO_SPEED; }
 #if defined(ESP_ARDUINO_VERSION_MAJOR) &amp;&amp; ESP_ARDUINO_VERSION_MAJOR &gt;= 3
 static inline void emitAttach()            { ledcAttach(PIN_EMIT, CARRIER_HZ, LEDC_RES); }
 static inline void emitDuty(uint32_t duty) { ledcWrite(PIN_EMIT, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(PIN_EMIT, hz); }
 #else
 static inline void emitAttach() {
   ledcSetup(LEDC_CH, CARRIER_HZ, LEDC_RES);
   ledcAttachPin(PIN_EMIT, LEDC_CH);
 }
 static inline void emitDuty(uint32_t duty) { ledcWrite(LEDC_CH, duty); }
+static inline void emitTone(uint32_t hz)   { ledcWriteTone(LEDC_CH, hz); }
 #endif
 
 void emitStop();
+float pingOnceCm();
+void selfCheck();
+void consoleHelp();
+void consoleTick();
+void consoleRun(char *, uint8_t);
 
 /* ---------------- input conditioning ----------------
  *
@@ -703,6 +1268,7 @@ const uint8_t DEBOUNCE_PASSES = 4;
 const uint8_t GROUP_PASSES    = 3;
 const uint8_t ADC_SAMPLES     = 16;
 const uint8_t PING_GAP_MS     = 10;   // let the previous burst die down
+const uint8_t CONSOLE_IDLE_MS = 80;   // dispatch a command with no terminator
 
 const uint8_t B_PERSON = 0, B_NONTARGET = 1, B_ESTOP = 2, B_COUNT = 3;
 int     btnPin[B_COUNT];
@@ -719,8 +1285,12 @@ bool pressed(uint8_t i) {
 }
 
 uint8_t groupStable = 1;
+uint8_t groupTyped  = 1;        // used when no pot is fitted
 
 uint8_t readGroup() {
+#if !HAVE_POT
+  return groupTyped;
+#else
   uint32_t acc = 0;
   for (uint8_t i = 0; i &lt; ADC_SAMPLES; i++) acc += analogRead(POT_GROUP);
   long    span = map((long)(acc / ADC_SAMPLES), 0L, 4095L, 1L, 8L);
@@ -731,6 +1301,151 @@ uint8_t readGroup() {
   else if (agree &lt; GROUP_PASSES) { agree++; }
   if (agree &gt;= GROUP_PASSES) groupStable = candidate;
   return groupStable;
+#endif
+}
+
+/* ---------------- serial console ----------------
+ *
+ * Every physical input has a keyboard equivalent, for two reasons. A rig gets
+ * built with parts that did not arrive, and a rig gets demonstrated in a room
+ * where a jumper has shaken loose. Neither should cost you the argument, and
+ * the argument is the refusals.
+ *
+ * Typing a veto is not the same claim as pressing one, so the console says
+ * which it was in the log. Do not narrate a typed veto as a wired one.
+ */
+bool  typedPerson = false, typedNonTarget = false;
+uint8_t vehicles = 0;        // vehicles in the zone, typed with v0..v9
+float simDistanceCm = 999.0f;
+
+/* A typed distance overrides the sensor until the next reset.
+ *
+ * Without this, enabling the sensor silently disabled the console&#x27;s d command:
+ * it was still accepted and still acknowledged, and the governor went on
+ * reading the sensor. Anything driving the board over USB - the web bench, for
+ * instance - would appear to do nothing, while the log insisted the distance
+ * had been set. An input that reports success and changes nothing is worse
+ * than one that is missing.
+ *
+ * Cleared by r, so &#x27;r&#x27; means &quot;go back to trusting the sensor&quot;. */
+bool  distanceOverride = false;
+
+void consoleHelp() {
+  Serial.println(&quot;console: g1..g8 group size | p person veto | n dog/goat veto&quot;);
+  Serial.println(&quot;         v0..v9 vehicles in the zone, e.g. v5 -&gt; refused&quot;);
+  Serial.println(&quot;         e e-stop | r clear latches | ? this help&quot;);
+#if HAVE_SENSOR
+  Serial.println(&quot;         d0..d400 overrides the sensor until r, e.g. d25&quot;);
+#else
+  Serial.println(&quot;         d0..d400 distance in cm, e.g. d25 -&gt; permitted&quot;);
+#endif
+#if !HAVE_POT
+  Serial.println(&quot;         no pot fitted, so group size comes from g1..g8&quot;);
+#endif
+}
+
+void consoleRun(char *line, uint8_t len) {
+  char cmd = line[0];
+  long arg = (len &gt; 1) ? atol(line + 1) : -1;
+
+  if (cmd == &#x27;g&#x27;) {
+    if (arg &gt;= 1 &amp;&amp; arg &lt;= 8) {
+      groupTyped = (uint8_t)arg;
+      Serial.printf(&quot;console: group size set to %u\n&quot;, groupTyped);
+    } else {
+      Serial.println(&quot;console: group size must be 1 to 8, e.g. g5&quot;);
+    }
+  } else if (cmd == &#x27;d&#x27;) {
+    if (arg &gt;= 0 &amp;&amp; arg &lt;= 400) {
+      simDistanceCm = (float)arg;
+      distanceOverride = true;          // stop reading the sensor until r
+      Serial.printf(&quot;console: distance set to %ld cm (%.1f m scaled)\n&quot;,
+                    arg, arg / DESK_SCALE);
+    } else {
+      Serial.println(&quot;console: distance must be 0 to 400 cm, e.g. d80&quot;);
+    }
+  } else if (cmd == &#x27;v&#x27;) {
+    if (arg &gt;= 0 &amp;&amp; arg &lt;= 9) {
+      vehicles = (uint8_t)arg;
+      Serial.printf(&quot;console: %u vehicle(s) in the zone%s\n&quot;, (unsigned)vehicles,
+                    vehicles &gt; MAX_TRAFFIC ? &quot; - over the limit&quot; : &quot;&quot;);
+    } else {
+      Serial.println(&quot;console: vehicles must be 0 to 9, e.g. v5&quot;);
+    }
+  } else if (cmd == &#x27;p&#x27;) {
+    typedPerson = !typedPerson;
+    Serial.printf(&quot;console: PERSON veto %s (typed, not wired)\n&quot;,
+                  typedPerson ? &quot;on&quot; : &quot;off&quot;);
+  } else if (cmd == &#x27;n&#x27;) {
+    typedNonTarget = !typedNonTarget;
+    Serial.printf(&quot;console: DOG/GOAT veto %s (typed, not wired)\n&quot;,
+                  typedNonTarget ? &quot;on&quot; : &quot;off&quot;);
+  } else if (cmd == &#x27;e&#x27;) {
+    estopLatched = true;
+    Serial.println(&quot;console: E-STOP asserted&quot;);
+  } else if (cmd == &#x27;r&#x27;) {
+    /* Clear the typed vetoes too.
+     *
+     * They are toggles, so anything driving this console - a person or the web
+     * page - has no way to read their state, only to flip them. A reset that
+     * leaves them set means the driver&#x27;s model and the board disagree from the
+     * first command onward, and every later toggle stays inverted. Reset has
+     * to mean reset, or it is just another source of drift. */
+    estopLatched = false;
+    doNotEmit = false;
+    typedPerson = false;
+    typedNonTarget = false;
+    vehicles = 0;
+    distanceOverride = false;      // back to the sensor
+    exposureUsedMs = 0;
+    state = IDLE;
+    attempts = 0;
+    incidentStart = 0;
+    Serial.println(&quot;console: latches cleared&quot;);
+  } else if (cmd == &#x27;?&#x27;) {
+    consoleHelp();
+  } else {
+    Serial.printf(&quot;console: unknown command &#x27;%s&#x27;, try ?\n&quot;, line);
+  }
+}
+
+void consoleTick() {
+  /* Two ways a command gets here, because the Serial Monitor has a line-ending
+   * dropdown and it is not the operator&#x27;s job to know about it.
+   *
+   * Set to &quot;New Line&quot; it sends p\n and the newline dispatches. Set to &quot;No Line
+   * Ending&quot; it sends a bare p and nothing follows, so a parser that waits for a
+   * terminator waits forever and the console looks broken. That is a real
+   * regression I shipped: character-by-character parsing handled the bare p,
+   * line buffering did not.
+   *
+   * So: dispatch on the newline if one arrives, and otherwise on a short
+   * silence. A human cannot type two commands 80 ms apart, and the monitor
+   * sends a whole line in one burst, so the silence is unambiguous. */
+  static char line[24];
+  static uint8_t n = 0;
+  static uint32_t lastChar = 0;
+
+  while (Serial.available() &gt; 0) {
+    int c = Serial.read();
+    lastChar = millis();
+    if (c == &#x27;\r&#x27;) continue;
+    if (c != &#x27;\n&#x27;) {
+      if (n &lt; sizeof(line) - 1) line[n++] = (char)c;
+      continue;
+    }
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    if (len &gt; 0) consoleRun(line, len);
+  }
+
+  if (n &gt; 0 &amp;&amp; (millis() - lastChar) &gt; CONSOLE_IDLE_MS) {
+    line[n] = 0;
+    uint8_t len = n;
+    n = 0;
+    consoleRun(line, len);
+  }
 }
 
 void setup() {
@@ -764,8 +1479,101 @@ void setup() {
   Serial.printf(&quot;daily budget     %.1f s   (demo %.1f s)\n&quot;,
                 DAILY_BUDGET_MS / 1000.0, scaled(DAILY_BUDGET_MS) / 1000.0);
   Serial.printf(&quot;max group        %d\n&quot;, MAX_GROUP);
+  Serial.printf(&quot;max traffic      %d vehicles in the zone\n&quot;, MAX_TRAFFIC);
   Serial.println(&quot;timers compressed for the demo; shipped values shown first&quot;);
   Serial.println(&quot;NO calibrated mic attached: this rig makes no dB claim&quot;);
+  Serial.println();
+  selfCheck();
+  consoleHelp();
+  Serial.println();
+}
+
+/* Power-on self check.
+ *
+ * A governor made of refusals cannot tell you it is miswired: a floating
+ * E-stop latches, a dead sensor reads as &quot;nothing there&quot;, and both look
+ * exactly like the system working correctly and declining to emit. Every
+ * silent failure mode in this rig presents as a deliberate refusal, so the
+ * inputs get examined once at boot, before the logic can hide behind them. */
+void selfCheck() {
+  Serial.println(&quot;power-on self check&quot;);
+
+#if HAVE_ESTOP
+  uint8_t lows = 0;
+  for (uint8_t i = 0; i &lt; 40; i++) {
+    if (digitalRead(BTN_ESTOP) == LOW) lows++;
+    delay(5);
+  }
+  if (lows == 0) {
+    Serial.println(&quot;  E-stop input    OK, held high&quot;);
+  } else if (lows == 40) {
+    Serial.println(&quot;  E-stop input    STUCK LOW - button held closed, or both its &quot;
+                   &quot;wires are on the same side of the switch&quot;);
+  } else {
+    Serial.printf(&quot;  E-stop input    FLOATING (%u of 40 samples low) - the 10k &quot;
+                  &quot;pull-up to 3V3 is not connected\n&quot;, lows);
+  }
+#else
+  const uint8_t lows = 0;
+  Serial.println(&quot;  E-stop input    NOT FITTED - the wired stop is disabled; &quot;
+                 &quot;console &#x27;e&#x27; still latches&quot;);
+#endif
+
+#if HAVE_SENSOR
+  uint8_t echoes = 0;
+  for (uint8_t i = 0; i &lt; 5; i++) {
+    if (pingOnceCm() &gt; 0) echoes++;
+    delay(60);
+  }
+  if (echoes &gt; 0) {
+    Serial.printf(&quot;  distance sensor OK, %u of 5 pings returned\n&quot;, echoes);
+  } else {
+    Serial.println(&quot;  distance sensor NO ECHO - check VCC is on VIN/5V not 3V3, &quot;
+                   &quot;and that TRIG and ECHO are not swapped&quot;);
+  }
+#else
+  const uint8_t echoes = 1;
+  Serial.println(&quot;  distance sensor NOT FITTED - distance comes from the &quot;
+                 &quot;console, type d80&quot;);
+#endif
+
+#if !HAVE_POT
+  Serial.println(&quot;  group knob      NOT FITTED - group size comes from the &quot;
+                 &quot;console, type g5&quot;);
+#else
+  uint32_t acc = 0;
+  for (uint8_t i = 0; i &lt; 16; i++) acc += analogRead(POT_GROUP);
+  Serial.printf(&quot;  group knob      reads %lu of 4095\n&quot;,
+                (unsigned long)(acc / 16));
+#endif
+
+  if (lows &gt; 0 || echoes == 0) {
+    Serial.println(&quot;  ^ fix the above before reading anything into a refusal&quot;);
+  }
+#if !HAVE_ESTOP || !HAVE_SENSOR || !HAVE_POT
+  Serial.println();
+  Serial.println(&quot;  DECLARE THIS WHEN YOU DEMONSTRATE:&quot;);
+#if !HAVE_SENSOR
+  Serial.println(&quot;    the distance input is typed, not sensed&quot;);
+#endif
+#if !HAVE_POT
+  Serial.println(&quot;    the group size is typed, not read from a knob&quot;);
+#endif
+#if !HAVE_ESTOP
+  Serial.println(&quot;    the emergency stop is a console command, not a wired button&quot;);
+#endif
+#if ONE_LAMP_MODE
+  Serial.println(&quot;    one lamp, not three: solid means emitting, a slow pulse &quot;
+                 &quot;means refused, a fast flutter means it gave up&quot;);
+#elif TWO_LAMP_MODE &amp;&amp; FAR_LAMP_MODE
+  Serial.println(&quot;    lamps: green permits, red refuses, red blinking is &quot;
+                 &quot;escalation, yellow is out of acoustic range&quot;);
+#elif TWO_LAMP_MODE
+  Serial.println(&quot;    two lamps, not three: green permits, red refuses, &quot;
+                 &quot;red blinking is escalation&quot;);
+#endif
+  Serial.println(&quot;    the governor rules below are unchanged and are doing the deciding&quot;);
+#endif
   Serial.println();
 }
 
@@ -773,6 +1581,14 @@ void setup() {
  * nothing else needs servicing during a 25 ms envelope, and it keeps the shape
  * identical to emitter.py rather than approximated by a scheduler. */
 void emitStart() {
+#if AUDIBLE_MARKER
+  /* Marker first, then the real carrier. Deliberately before the ramp, so the
+   * envelope that follows is untouched by it. */
+  emitTone(MARKER_HZ);
+  delay(MARKER_MS);
+  emitTone(0);
+  emitAttach();                 // back to CARRIER_HZ after the tone changed it
+#endif
   for (uint16_t t = 0; t &lt;= RAMP_MS; t++) {
     float x = (float)t / RAMP_MS;                 // 0..1
     float e = 0.5f * (1.0f - cosf(PI * x));       // raised cosine
@@ -828,11 +1644,43 @@ float readRangeCm() {
   return a + b + c - hi - lo;
 }
 
+#if ONE_LAMP_MODE
+/* One lamp, three states, told apart by rate. */
+void leds(bool p, bool r, bool e) {
+  uint32_t ms = millis();
+  bool on;
+  if (p)      on = true;                        // emitting: solid
+  else if (e) on = ((ms / 120) % 2) == 0;       // escalated: fast flutter
+  else if (r) on = ((ms / 500) % 2) == 0;       // refusing: slow pulse
+  else        on = false;                       // nothing detected
+  digitalWrite(LAMP_ONE, on);
+}
+#elif TWO_LAMP_MODE
+/* Two working lamps instead of three.
+ *
+ * Three states, two lights, so escalation has to be distinguishable from a
+ * refusal by something other than colour: it blinks. */
+void leds(bool p, bool r, bool e) {
+  digitalWrite(LAMP_GO, p);
+  bool blink = ((millis() / 250) % 2) == 0;
+#if FAR_LAMP_MODE
+  /* A range refusal lights yellow and only yellow. Sharing red would leave the
+   * three zones as two colours, and the point of the third lamp is that the
+   * distance reads without narration: red too close, green in range, yellow
+   * too far. Escalation still owns blinking red, whatever the reason was. */
+  digitalWrite(LAMP_STOP, e ? blink : (r &amp;&amp; !farRefusal));
+  digitalWrite(LAMP_FAR, farRefusal &amp;&amp; !e);
+#else
+  digitalWrite(LAMP_STOP, e ? blink : r);
+#endif
+}
+#else
 void leds(bool p, bool r, bool e) {
   digitalWrite(LED_PERMIT, p);
   digitalWrite(LED_REFUSE, r);
   digitalWrite(LED_ESCALATE, e);
 }
+#endif
 
 void loop() {
   uint32_t now = millis();
@@ -842,11 +1690,15 @@ void loop() {
    * a veto button already held down when the animal walks in would need four
    * more passes to be believed, and the governor would permit emission in the
    * gap. Safety inputs must be settled before they are needed, not after. */
-  bool person    = pressed(B_PERSON);
-  bool nonTarget = pressed(B_NONTARGET);
+  consoleTick();
+  farRefusal = false;          // set below only by the out-of-range refusal
+  bool person    = pressed(B_PERSON)    || typedPerson;
+  bool nonTarget = pressed(B_NONTARGET) || typedNonTarget;
   uint8_t group  = readGroup();
 
+#if HAVE_ESTOP
   if (pressed(B_ESTOP)) estopLatched = true;
+#endif
   if (estopLatched) {
     emitStop(&quot;E-STOP&quot;);
     state = INHIBITED;
@@ -861,8 +1713,12 @@ void loop() {
 
   if (now - lastBeat &gt; 900) { lastBeat = now; armedLed = !armedLed; digitalWrite(LED_ARMED, armedLed); }
 
-  float cm = readRangeCm();
-  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; 200);
+#if HAVE_SENSOR
+  float cm = distanceOverride ? simDistanceCm : readRangeCm();
+#else
+  float cm = simDistanceCm;
+#endif
+  bool  seen = (cm &gt; 0 &amp;&amp; cm &lt; SEEN_MAX_CM);
   float metres = seen ? (cm / DESK_SCALE) : 999.0f;
 
   if (state == EMITTING &amp;&amp; (now - emitStartedAt) &gt;= scaled(MAX_ACTIVATION_MS)) {
@@ -888,7 +1744,9 @@ void loop() {
   else if (person)                   deny = &quot;a person is inside the exposure cone&quot;;
   else if (nonTarget)                deny = &quot;a non-target species is inside the cone&quot;;
   else if (group &gt; MAX_GROUP)        deny = &quot;group large enough that a startle could cascade&quot;;
-  else if (metres &gt; RANGE_MAX_M)     deny = &quot;beyond the acoustic envelope&quot;;
+  else if (metres &gt; RANGE_MAX_M)   { deny = &quot;beyond the acoustic envelope&quot;;
+                                     farRefusal = true; }
+  else if (vehicles &gt; MAX_TRAFFIC)   deny = &quot;traffic in the zone - a startled animal could bolt into it&quot;;
   else if (metres &lt;= LINE_M)         deny = &quot;already at the carriageway - fleeing would cross it&quot;;
   else if (state == COOLDOWN &amp;&amp;
            (now - lastEmissionEnd) &lt; scaled(MIN_SILENCE_MS))

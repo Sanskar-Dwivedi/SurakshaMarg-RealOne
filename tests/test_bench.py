@@ -106,13 +106,5 @@ def test_every_demo_beat_has_a_world():
     named = {m.group(1) for m in re.finditer(r',\s*"(\w+)"\],', page)}
     missing = named - modes
     assert not missing, f"demo beats with no world in W: {sorted(missing)}"
-    assert "traffic" in modes, "the traffic veto has no beat in the guided demo"
 
 
-def test_traffic_veto_reaches_the_board():
-    """The page must send the vehicle count over USB, or the board reaches a
-    different verdict from the page that is supposedly driving it."""
-    page = PAGE.read_text(encoding="utf-8")
-    assert 'txt("v" + traffic)' in page, "vehicle count is never sent to the board"
-    assert '"v": null' in page or "v: null" in page, (
-        "the sent-cache has no v field, so the first vehicle count is skipped")

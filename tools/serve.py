@@ -28,6 +28,7 @@ milliseconds.
 from __future__ import annotations
 
 import argparse
+from functools import partial
 import http.server
 import socketserver
 from pathlib import Path
@@ -69,7 +70,11 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args()
 
-    handler = type("H", (NoCache,), {"directory": str(ROOT)})
+    # partial, not a class attribute: SimpleHTTPRequestHandler.__init__ always
+    # assigns self.directory from its keyword argument (defaulting to the
+    # process cwd), so a class attribute of the same name is silently ignored
+    # and the server quietly serves whatever directory it was launched from.
+    handler = partial(NoCache, directory=str(ROOT))
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", args.port), handler) as httpd:
         base = f"http://127.0.0.1:{args.port}"

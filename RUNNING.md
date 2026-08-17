@@ -55,7 +55,40 @@ screen puppeting the lamps.
 The most robust path, and the one to fall back on if anything else misbehaves.
 
 Flash `hardware/wokwi_esp32/gaukavach_esp32.ino` — Board: **ESP32 Dev Module**,
-core 3.x, no libraries. Then open the Serial Monitor at **115200** and type:
+core 3.x, no libraries.
+
+### Check what is actually flashed before debugging anything else
+
+A board running the wrong sketch looks exactly like broken wiring. Three
+lamps stayed dark for an afternoon because the board still had a
+distance-to-buzzer test sketch on it, which never writes to a lamp pin at
+all - nothing was faulty, nothing was driving them. Ask the board what it is
+before you ask the breadboard.
+
+Open the port at 115200 and send `?`. The governor answers with its console
+help (`g1..g8 group size | p person veto | ...`). Anything else, or silence,
+means something else is flashed. Note the governor is SILENT when idle - it
+only prints on events - so no output is not the same as no firmware.
+
+### Flashing from the command line
+
+The Arduino IDE is the supported path, but it is not required. The IDE ships
+`arduino-cli` inside itself:
+
+    "$LOCALAPPDATA/Programs/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe"
+
+Two things bite:
+
+  * Arduino requires the main `.ino` to be named after its folder, and
+    `wokwi_esp32/gaukavach_esp32.ino` is not. Copy it into a temp folder
+    named `gaukavach_esp32/` and build that. Do not rename it in the repo -
+    the Wokwi copies are kept in step by a test.
+  * The Serial Monitor holds the port exclusively. Close it, or the upload
+    and any script fail with access denied.
+
+        arduino-cli compile --fqbn esp32:esp32:esp32 <tmp>/gaukavach_esp32
+        arduino-cli upload -p COM5 --fqbn esp32:esp32:esp32 <tmp>/gaukavach_esp32
+ Then open the Serial Monitor at **115200** and type:
 
 | Type   | What happens                                    |
 | ------ | ----------------------------------------------- |

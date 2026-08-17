@@ -167,6 +167,20 @@ const uint16_t RAMP_MS   = 25;         // raised-cosine rise and fall
 
 /* ------------- governor limits, mirroring evidence.py ------------- */
 const uint8_t  MAX_GROUP         = 3;
+/* Vehicles in the zone above which a startle is not permitted.
+ *
+ * This rule refuses at exactly the moment a collision is possible, which reads
+ * backwards, so it is worth writing down why. The emitter does not steer an
+ * animal, it startles one, and a startled animal chooses its own direction.
+ * On a clear road that gamble is cheap - the worst case is an animal moving
+ * the wrong way across empty tarmac. With vehicles present the worst case is
+ * an animal bolting into one, and the system has then caused the collision it
+ * exists to prevent.
+ *
+ * The window for acoustics is therefore BEFORE the traffic arrives. Once that
+ * window has closed the useful output is the traffic warning, which needs no
+ * cooperation from the animal, not a louder attempt at the animal. */
+const uint8_t  MAX_TRAFFIC       = 3;
 const uint32_t MAX_ACTIVATION_MS = 6000;
 const uint32_t MIN_SILENCE_MS    = 20000;
 const uint32_t DAILY_BUDGET_MS   = 120000;
@@ -303,6 +317,7 @@ uint8_t readGroup() {
  * which it was in the log. Do not narrate a typed veto as a wired one.
  */
 bool  typedPerson = false, typedNonTarget = false;
+uint8_t vehicles = 0;        // vehicles in the zone, typed with v0..v9
 float simDistanceCm = 999.0f;
 
 /* A typed distance overrides the sensor until the next reset.
@@ -319,6 +334,7 @@ bool  distanceOverride = false;
 
 void consoleHelp() {
   Serial.println("console: g1..g8 group size | p person veto | n dog/goat veto");
+  Serial.println("         v0..v9 vehicles in the zone, e.g. v5 -> refused");
   Serial.println("         e e-stop | r clear latches | ? this help");
 #if HAVE_SENSOR
   Serial.println("         d0..d400 overrides the sensor until r, e.g. d25");
@@ -350,6 +366,14 @@ void consoleRun(char *line, uint8_t len) {
     } else {
       Serial.println("console: distance must be 0 to 400 cm, e.g. d80");
     }
+  } else if (cmd == 'v') {
+    if (arg >= 0 && arg <= 9) {
+      vehicles = (uint8_t)arg;
+      Serial.printf("console: %u vehicle(s) in the zone%s\n", (unsigned)vehicles,
+                    vehicles > MAX_TRAFFIC ? " - over the limit" : "");
+    } else {
+      Serial.println("console: vehicles must be 0 to 9, e.g. v5");
+    }
   } else if (cmd == 'p') {
     typedPerson = !typedPerson;
     Serial.printf("console: PERSON veto %s (typed, not wired)\n",
@@ -373,6 +397,7 @@ void consoleRun(char *line, uint8_t len) {
     doNotEmit = false;
     typedPerson = false;
     typedNonTarget = false;
+    vehicles = 0;
     distanceOverride = false;      // back to the sensor
     exposureUsedMs = 0;
     state = IDLE;
@@ -406,8 +431,8 @@ void consoleTick() {
   while (Serial.available() > 0) {
     int c = Serial.read();
     lastChar = millis();
-    if (c == '\\r') continue;
-    if (c != '\\n') {
+    if (c == '\r') continue;
+    if (c != '\n') {
       if (n < sizeof(line) - 1) line[n++] = (char)c;
       continue;
     }
@@ -456,6 +481,7 @@ void setup() {
   Serial.printf("daily budget     %.1f s   (demo %.1f s)\n",
                 DAILY_BUDGET_MS / 1000.0, scaled(DAILY_BUDGET_MS) / 1000.0);
   Serial.printf("max group        %d\n", MAX_GROUP);
+  Serial.printf("max traffic      %d vehicles in the zone\n", MAX_TRAFFIC);
   Serial.println("timers compressed for the demo; shipped values shown first");
   Serial.println("NO calibrated mic attached: this rig makes no dB claim");
   Serial.println();
@@ -722,6 +748,7 @@ void loop() {
   else if (group > MAX_GROUP)        deny = "group large enough that a startle could cascade";
   else if (metres > RANGE_MAX_M)   { deny = "beyond the acoustic envelope";
                                      farRefusal = true; }
+  else if (vehicles > MAX_TRAFFIC)   deny = "traffic in the zone - a startled animal could bolt into it";
   else if (metres <= LINE_M)         deny = "already at the carriageway - fleeing would cross it";
   else if (state == COOLDOWN &&
            (now - lastEmissionEnd) < scaled(MIN_SILENCE_MS))

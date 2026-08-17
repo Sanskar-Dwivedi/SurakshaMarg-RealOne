@@ -1,0 +1,912 @@
+<title>GauKavach &mdash; Operations Console</title>
+<style>
+:root{
+  --ground:#EDF0F3; --surface:#FFFFFF; --surface-2:#F5F8FA; --sunk:#E4E9ED;
+  --ink:#0F141A; --body:#28323C; --muted:#5D6B79; --faint:#8695A3;
+  --line:#D2DAE1; --line-strong:#B6C2CC;
+  --accent:#0E7C86; --accent-soft:#DBEDEF; --accent-line:#8FC6CB;
+  --ok:#1C7A4B; --ok-bg:#E2F1E8;
+  --warn:#93670A; --warn-bg:#F8EFD8;
+  --crit:#A9291F; --crit-bg:#F8E4E2;
+  --sky:#C9D6DE; --grass:#B9C6A8; --road:#8B9299; --paint:#EEF2F4;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C1116; --surface:#131A21; --surface-2:#182028; --sunk:#0A0F13;
+    --ink:#E9EEF3; --body:#C3CFD9; --muted:#8FA0AE; --faint:#6B7C8A;
+    --line:#212C36; --line-strong:#2E3C48;
+    --accent:#40B9C2; --accent-soft:#10333A; --accent-line:#1F6771;
+    --ok:#5FBF8A; --ok-bg:#12291E;
+    --warn:#D9A63C; --warn-bg:#2C2314;
+    --crit:#E0776C; --crit-bg:#2E1815;
+    --sky:#1A2530; --grass:#243026; --road:#2B333A; --paint:#5A6672;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C1116; --surface:#131A21; --surface-2:#182028; --sunk:#0A0F13;
+  --ink:#E9EEF3; --body:#C3CFD9; --muted:#8FA0AE; --faint:#6B7C8A;
+  --line:#212C36; --line-strong:#2E3C48;
+  --accent:#40B9C2; --accent-soft:#10333A; --accent-line:#1F6771;
+  --ok:#5FBF8A; --ok-bg:#12291E;
+  --warn:#D9A63C; --warn-bg:#2C2314;
+  --crit:#E0776C; --crit-bg:#2E1815;
+  --sky:#1A2530; --grass:#243026; --road:#2B333A; --paint:#5A6672;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--body);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.55}
+h1,h2,h3{font-family:Charter,"Bitstream Charter","Iowan Old Style",Georgia,serif;color:var(--ink);margin:0}
+.mono,code{font-family:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace}
+
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:13px 22px 0;
+  display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.brand{flex:1 1 300px;min-width:240px}
+.eyebrow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent)}
+h1{font-size:19px;letter-spacing:-.01em;line-height:1.2}
+.hdr-note{font-size:11.5px;color:var(--muted);margin-top:3px;max-width:62ch}
+.buildstamp{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;
+  letter-spacing:.06em;color:var(--faint);margin-top:5px}
+.hdrstats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line)}
+.hs{background:var(--surface-2);padding:6px 11px;min-width:84px}
+.hs-k{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--faint)}
+.hs-v{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;color:var(--ink);
+  font-variant-numeric:tabular-nums;margin-top:2px}
+
+nav{width:100%;display:flex;gap:2px;margin-top:12px}
+nav button{font:inherit;font-size:12.5px;padding:9px 18px;background:transparent;
+  border:1px solid transparent;border-bottom:0;color:var(--muted);cursor:pointer;
+  font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.03em}
+nav button:hover{color:var(--ink)}
+nav button.on{background:var(--ground);border-color:var(--line);color:var(--ink);
+  position:relative;top:1px}
+nav button .tag{font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);display:block;margin-top:1px}
+
+.shell{display:grid;grid-template-columns:minmax(0,1fr) 366px;min-height:calc(100vh - 118px)}
+@media (max-width:1080px){ .shell{grid-template-columns:minmax(0,1fr)} }
+.stage{padding:16px 18px;display:flex;flex-direction:column;gap:11px;min-width:0}
+.canvaswrap{position:relative;border:1px solid var(--line-strong);background:#000;
+  width:100%;overflow:hidden}
+canvas{display:block;width:100%;height:auto;touch-action:none}
+#cvWrap canvas{cursor:crosshair}
+.badge{position:absolute;top:9px;left:9px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;padding:4px 8px;
+  background:var(--crit);color:#fff;pointer-events:none;z-index:2}
+.credit{position:absolute;bottom:34px;right:9px;font-size:10px;color:#fff;
+  background:rgba(0,0,0,.55);padding:3px 8px;pointer-events:none;z-index:2;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+
+.controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+button,select{font:inherit;font-size:12.5px;padding:6px 12px;background:var(--surface);
+  color:var(--body);border:1px solid var(--line-strong);cursor:pointer}
+button:hover,select:hover{border-color:var(--accent);color:var(--ink)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+input[type=range]{flex:1 1 170px;min-width:110px;accent-color:var(--accent)}
+.tmark{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--muted);
+  font-variant-numeric:tabular-nums;min-width:82px}
+.toggles{display:flex;flex-wrap:wrap;gap:6px}
+.toggles button{font-size:11px;padding:4px 9px}
+.note{font-size:12.5px;color:var(--muted);border-left:2px solid var(--accent-line);
+  padding-left:12px;max-width:98ch}
+.note strong{color:var(--ink)}
+
+.panel{background:var(--surface);border-left:1px solid var(--line);padding:15px 17px;
+  display:flex;flex-direction:column;gap:13px;overflow-y:auto;max-height:calc(100vh - 118px)}
+@media (max-width:1080px){ .panel{border-left:0;border-top:1px solid var(--line);max-height:none} }
+.verdict{border:1px solid var(--line);padding:12px 14px}
+.verdict .lbl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.verdict .big{font-family:Charter,Georgia,serif;font-size:22px;line-height:1.15;margin-top:3px;color:var(--ink)}
+.verdict .sub{font-size:12px;color:var(--muted);margin-top:6px}
+.verdict.permit{background:var(--ok-bg);border-color:var(--ok)} .verdict.permit .big{color:var(--ok)}
+.verdict.refuse{background:var(--crit-bg);border-color:var(--crit)} .verdict.refuse .big{color:var(--crit)}
+.verdict.hold{background:var(--warn-bg);border-color:var(--warn)} .verdict.hold .big{color:var(--warn)}
+
+.sec{border-top:1px solid var(--line);padding-top:11px}
+.sec:first-of-type{border-top:0;padding-top:0}
+h3{font-size:12px;letter-spacing:.02em;margin-bottom:7px}
+.small{font-size:11.5px;color:var(--muted)}
+.veto{display:flex;gap:7px;align-items:flex-start;font-size:12px;padding:5px 0;
+  border-bottom:1px solid var(--line)}
+.veto:last-child{border-bottom:0}
+.veto .x{color:var(--crit);font-family:ui-monospace,Menlo,monospace;flex:none}
+.actor{border:1px solid var(--line);padding:8px 10px;margin-bottom:6px;background:var(--surface-2)}
+.actor .row1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.actor .nm{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--ink)}
+.actor .dd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.flags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.chip{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9px;
+  letter-spacing:.04em;padding:2px 6px;border:1px solid currentColor;text-transform:uppercase}
+.c-t{color:var(--accent);background:var(--accent-soft)}
+.c-bad{color:var(--crit);background:var(--crit-bg)}
+.c-warn{color:var(--warn);background:var(--warn-bg)}
+.c-ok{color:var(--ok);background:var(--ok-bg)}
+.c-mut{color:var(--faint)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px;
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.kv dt{color:var(--faint)} .kv dd{margin:0;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;line-height:1.6;
+  background:var(--sunk);border:1px solid var(--line);padding:8px 10px;max-height:150px;overflow-y:auto}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log .em{color:var(--accent)} .log .rf{color:var(--crit)}
+.log .es{color:var(--warn)} .log .tf{color:var(--ok)}
+
+/* outcomes view */
+.wide{padding:20px 22px 60px;max-width:1180px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px;margin-top:18px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);padding:16px 18px}
+.card h3{margin-top:0}
+.cap{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.5}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:400;
+  padding:8px 11px;border-bottom:1px solid var(--line-strong);background:var(--surface-2);white-space:nowrap}
+td{padding:8px 11px;border-bottom:1px solid var(--line)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,monospace;color:var(--ink)}
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--surface);margin-top:14px}
+.callout{border:1px solid var(--line);border-left:3px solid var(--accent);
+  background:var(--surface);padding:15px 18px;margin-top:20px}
+.callout.crit{border-left-color:var(--crit);background:var(--crit-bg)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.callout .lbl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.callout.crit .lbl{color:var(--crit)} .callout.warn .lbl{color:var(--warn)}
+.callout p{margin:0;max-width:74ch} .callout p+p{margin-top:9px}
+h2{font-size:23px;letter-spacing:-.01em}
+.lede{max-width:70ch;margin-top:10px}
+svg{display:block;width:100%;height:auto}
+.hidden{display:none !important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<header>
+  <div class="brand">
+    <div class="eyebrow">Operations console</div>
+    <h1>GauKavach</h1>
+    <div class="hdr-note" id="hdrnote"></div>
+    <!-- Which build is on screen. The page is rebuilt constantly and is 6.6 MB,
+         so "did my reload actually get the new one?" is a real question and
+         the page should answer it rather than leave you guessing. -->
+    <div class="buildstamp" id="buildstamp">build <!--BUILD-->not stamped<!--/BUILD--></div>
+  </div>
+  <div class="hdrstats" id="hdrstats"></div>
+  <nav>
+    <button id="tab-real" class="on" data-v="real">Real footage<span class="tag">Delhi, live detector</span></button>
+    <button id="tab-scen" data-v="scen">Veto scenarios<span class="tag">what we can't film</span></button>
+    <button id="tab-out" data-v="out">Outcomes<span class="tag">does it work?</span></button>
+  </nav>
+</header>
+
+<!-- ============ REAL / SCENARIO VIEW ============ -->
+<div class="shell" id="view-play">
+  <div class="stage">
+    <div class="canvaswrap" id="cvWrap">
+      <canvas id="cv" width="1280" height="720"></canvas>
+      <div class="badge" id="badge">Real footage</div>
+      <div class="credit" id="credit"></div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="play">Pause</button>
+      <button id="step">Step</button>
+      <button id="restart">Restart</button>
+      <input type="range" id="scrub" min="0" max="100" value="0">
+      <span class="tmark" id="tmark">0.0 s</span>
+      <select id="scen" class="hidden"></select>
+      <button id="sandbox" class="hidden">Sandbox</button>
+      <button id="linkBtn">Link board</button>
+    </div>
+    <div class="toggles">
+      <button data-t="zones" class="on">Zones</button>
+      <button data-t="boxes" class="on">Detections</button>
+      <button data-t="flight" class="on">Flight vectors</button>
+      <button data-t="field" id="t-field">Decision field</button>
+      <button data-t="range">Range envelope</button>
+    </div>
+    <div class="note" id="note"></div>
+  </div>
+
+  <div class="panel">
+    <div class="verdict" id="verdict">
+      <div class="lbl">System state</div>
+      <div class="big" id="vbig">Idle</div>
+      <div class="sub" id="vsub"></div>
+    </div>
+    <div class="sec"><h3>Governor vetoes, this frame</h3><div id="vetoes"></div></div>
+    <div class="sec"><h3>Tracked</h3><div id="actors"></div></div>
+    <div class="sec"><h3>Run totals</h3><dl class="kv" id="totals"></dl></div>
+    <div class="sec"><h3>Event log</h3><div class="log" id="log"></div></div>
+  </div>
+</div>
+
+<!-- ============ OUTCOMES VIEW ============ -->
+<div class="wide hidden" id="view-out">
+  <h2>Does it actually move the animal?</h2>
+  <p class="lede">The scenario player shows the system <em>deciding</em>. It cannot show whether the decision works, because a scripted animal walks the same path either way. So the animal here is not scripted: when the emitter fires, the animal's response is drawn from the behavioural prior, it physically turns, stops, keeps coming or bolts, and the encounter runs to a real resolution.</p>
+  <p class="lede">One run would prove nothing. So every encounter is run <strong id="nruns"></strong> times, against a control arm that is identical except the emitter never fires.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Outcome of one approach</h3>
+      <div id="chart-out"></div>
+      <div class="scroll"><table id="outtable"><thead><tr>
+        <th>Outcome</th><th style="text-align:right">Emitter on</th><th style="text-align:right">Control</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>The mechanism, step by step</h3>
+      <div id="chart-trace"></div>
+      <p class="cap" id="tracecap"></p>
+    </div>
+  </div>
+
+  <div class="callout" id="headline"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>It helps least where you would expect it to help most</h3>
+      <div id="chart-sens"></div>
+      <p class="cap">A barely-motivated animal wanders off by itself, so there is nothing to improve and the effect is not separable from the control. The gain grows with how badly the animal wants to cross &mdash; which is also when it matters.</p>
+    </div>
+    <div class="card">
+      <h3>Traffic consequence</h3>
+      <div class="scroll"><table id="traftable"><tbody></tbody></table></div>
+      <p class="cap" id="trafcap"></p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="lbl">A trap we walked into, and the fix</div>
+    <p id="timingnote"></p>
+  </div>
+
+  <div class="callout crit">
+    <div class="lbl">What these numbers are not</div>
+    <p id="prov"></p>
+  </div>
+</div>
+
+<script id="sim" type="application/json"></script>
+<script id="foot" type="application/json"></script>
+<script id="outc" type="application/json"></script>
+<script>
+const D = JSON.parse(document.getElementById("sim").textContent);
+const FP = JSON.parse(document.getElementById("foot").textContent);
+const OUT = JSON.parse(document.getElementById("outc").textContent);
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const L = D.limits;
+
+let view = "real", scenName = "single-approach", fi = 0, playing = true, sandbox = false, last = 0;
+let drag = false, dragPt = {x:410, y:436};
+const show = {zones:true, boxes:true, flight:true, field:false, range:false};
+
+/* frames decoded once, not per redraw */
+const imgCache = new Map();
+for (let i = 0; i < FP.frames.length; i++){
+  const im = new Image();
+  im.src = "data:image/jpeg;base64," + FP.frames[i].img;
+  imgCache.set(i, im);
+}
+
+const F = D.field, fidx = new Map();
+for (const c of F.cells) fidx.set(c.x + "," + c.y, c);
+const FY0 = Math.floor(D.site.horizon_y) + F.step_px;
+function fieldAt(x, y){
+  const s = F.step_px;
+  const kx = Math.round(x/s)*s, ky = FY0 + Math.round((y-FY0)/s)*s;
+  for (let r=0;r<=3;r++) for (let dy=-r;dy<=r;dy++) for (let dx=-r;dx<=r;dx++){
+    const c = fidx.get((kx+dx*s)+","+(ky+dy*s)); if (c) return c;
+  }
+  return null;
+}
+
+/* -------- header -------- */
+document.getElementById("hdrstats").innerHTML = [
+  ["Ceiling", L.ceiling_db+"<span style='font-size:9px'> dB</span>"],
+  ["Refuses", L.refused_db+"<span style='font-size:9px'> dB</span>"],
+  ["Band", L.band_lo_khz+"-"+L.band_hi_khz+"<span style='font-size:9px'> kHz</span>"],
+  ["Max group", L.max_herd],
+  ["Max traffic", L.max_traffic],
+].map(([k,v])=>`<div class="hs"><div class="hs-k">${k}</div><div class="hs-v">${v}</div></div>`).join("");
+
+const sel = document.getElementById("scen");
+sel.innerHTML = Object.keys(D.scenarios).map(n=>`<option value="${n}">${n}</option>`).join("");
+sel.value = scenName;
+
+/* -------- current source -------- */
+function src(){
+  if (view === "real") return {
+    frames: FP.frames, site: FP.site, fps: FP.fps, real: true, geo: false,
+    summary: FP.summary, records: FP.records, key_events: null,
+    w: FP.out_resolution[0], h: FP.out_resolution[1],
+  };
+  const sc = D.scenarios[scenName];
+  return {
+    frames: sc.frames, site: D.site, fps: sc.fps, real: false, geo: true,
+    summary: sc.summary, records: sc.records, key_events: sc.key_events,
+    w: 1280, h: 720,
+  };
+}
+
+/* -------- drawing -------- */
+const poly = (S,pts) => { ctx.beginPath(); pts.forEach((p,i)=> i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.closePath(); };
+
+function drawSynthBackdrop(S){
+  const W = cv.width, H = cv.height, hz = S.horizon_y;
+  ctx.fillStyle = css("--sky"); ctx.fillRect(0,0,W,hz);
+  ctx.fillStyle = css("--grass"); ctx.fillRect(0,hz,W,H-hz);
+  const cw = S.carriageway;
+  ctx.fillStyle = css("--road");
+  poly(S,[[cw[0][0]-70,cw[0][1]],[cw[1][0]+70,cw[1][1]],[cw[2][0]+90,cw[2][1]],[cw[3][0]-90,cw[3][1]]]);
+  ctx.fill();
+  ctx.strokeStyle = css("--paint"); ctx.globalAlpha=.5;
+  ctx.setLineDash([26,22]); ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo((cw[0][0]+cw[1][0])/2, cw[0][1]);
+  ctx.lineTo((cw[2][0]+cw[3][0])/2, cw[2][1]);
+  ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+}
+
+function drawZones(S){
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = css("--warn"); ctx.setLineDash([9,7]);
+  poly(S,S.warning_zone); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css("--crit"); ctx.lineWidth = 2.5;
+  poly(S,S.carriageway); ctx.stroke();
+  ctx.font = "600 12px ui-monospace,Menlo,monospace"; ctx.textAlign="left";
+  ctx.fillStyle = css("--warn");
+  ctx.fillText("WARNING ZONE", S.warning_zone[0][0]+7, S.warning_zone[0][1]-7);
+  ctx.fillStyle = css("--crit");
+  ctx.fillText("CARRIAGEWAY", S.carriageway[0][0]+7, S.carriageway[0][1]+18);
+}
+
+function drawEmitter(S, pulse){
+  const ex = S.emitter_px[0], ey = S.emitter_px[1];
+  if (show.range){
+    ctx.strokeStyle = css("--accent"); ctx.globalAlpha=.5; ctx.setLineDash([6,6]); ctx.lineWidth=2;
+    for (const [rx,ry,lbl] of [[cv.width*0.34,cv.height*0.21,"22 m"],[cv.width*0.50,cv.height*0.33,"43 m max"]]){
+      ctx.beginPath(); ctx.ellipse(ex,ey,rx,ry,0,Math.PI,2*Math.PI); ctx.stroke();
+      ctx.fillStyle=css("--accent"); ctx.font="12px ui-monospace,Menlo,monospace";
+      ctx.textAlign="center"; ctx.fillText(lbl, ex, ey-ry-6);
+    }
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+  if (pulse>0){
+    ctx.strokeStyle = css("--accent"); ctx.lineWidth=3;
+    for (let k=0;k<3;k++){
+      const r = ((pulse + k*0.33)%1);
+      ctx.globalAlpha = (1-r)*.55;
+      ctx.beginPath(); ctx.ellipse(ex,ey,r*cv.width*0.44,r*cv.height*0.29,0,Math.PI,2*Math.PI); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  const mh = cv.height*0.085;
+  ctx.fillStyle = css("--ink"); ctx.fillRect(ex-4, ey-mh, 8, mh);
+  ctx.beginPath(); ctx.arc(ex, ey-mh-6, 10, 0, 7); ctx.fill();
+  ctx.fillStyle = css("--accent");
+  ctx.beginPath(); ctx.arc(ex, ey-mh-6, 6, 0, 7); ctx.fill();
+}
+
+function drawActor(S, a, vcol, synth, geo){
+  const [x1,y1,x2,y2] = a.b;
+  if (synth){
+    const fill = a.l==="person" ? css("--accent")
+               : a.g==="vehicle"  ? css("--warn")
+               : (a.t ? css("--ink") : css("--crit"));
+    const w=x2-x1, h=y2-y1;
+    ctx.fillStyle = fill;
+    if (a.l==="person"){
+      const cx=x1+w/2;
+      ctx.beginPath(); ctx.arc(cx, y1+h*0.10, Math.max(w*0.30,4),0,7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx-w*.30,y2); ctx.lineTo(cx-w*.22,y1+h*.24);
+      ctx.lineTo(cx+w*.22,y1+h*.24); ctx.lineTo(cx+w*.30,y2); ctx.closePath(); ctx.fill();
+    } else if (a.g==="vehicle"){
+      const cw=w*.92, ch=h*.62, cx=x1+w*.04, cy=y1+h*.30;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(cx, cy, cw, ch, Math.min(ch*.32, 9));
+      else ctx.rect(cx, cy, cw, ch);
+      ctx.fill();
+      ctx.beginPath();                       // cabin
+      ctx.moveTo(cx+cw*.24, cy);
+      ctx.lineTo(cx+cw*.36, cy-ch*.46);
+      ctx.lineTo(cx+cw*.70, cy-ch*.46);
+      ctx.lineTo(cx+cw*.80, cy);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,.55)";     // wheels
+      for (const fx of [.24,.74]){
+        ctx.beginPath();
+        ctx.ellipse(cx+cw*fx, cy+ch, Math.max(cw*.10,2.5), Math.max(ch*.20,2.5), 0,0,7);
+        ctx.fill();
+      }
+      ctx.fillStyle = fill;
+    } else {
+      const by=y1+h*.10, bh=h*.52;
+      ctx.beginPath(); ctx.ellipse(x1+w*.46, by+bh*.5, w*.40, bh*.52, 0,0,7); ctx.fill();
+      const lw=Math.max(w*.065,2);
+      for (const fx of [.20,.36,.62,.80]) ctx.fillRect(x1+w*fx-lw/2, by+bh*.85, lw, h-bh*.95-h*.10);
+      ctx.beginPath(); ctx.ellipse(x1+w*.86, by+bh*.34, w*.15, bh*.30, -.25,0,7); ctx.fill();
+    }
+  }
+  if (show.boxes){
+    const col = a.t ? css("--accent") : a.g==="vehicle" ? css("--warn") : css("--crit");
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.strokeRect(x1,y1,x2-x1,y2-y1);
+    const tag = geo ? `${a.sp} ${a.d}m` : `${a.sp}${a.cf ? " " + a.cf : ""}`;
+    ctx.font = "600 11px ui-monospace,Menlo,monospace";
+    const tw = ctx.measureText(tag).width + 9;
+    ctx.fillStyle = col; ctx.fillRect(x1, y1-16, tw, 16);
+    ctx.fillStyle = "#fff"; ctx.textAlign="left"; ctx.fillText(tag, x1+4, y1-4);
+    if (a.oh){
+      ctx.fillStyle = css("--crit"); ctx.fillRect(x1+tw+3, y1-16, 112, 16);
+      ctx.fillStyle="#fff"; ctx.font="600 9px ui-monospace,Menlo,monospace";
+      ctx.fillText("OUT-HEARS TARGET", x1+tw+7, y1-4);
+    }
+  }
+  if (show.flight && geo && a.t && a.fv){
+    const fx=(x1+x2)/2, fy=y2, [vx,vz]=a.fv;
+    const ang = Math.atan2(-vz, vx), len = Math.max(cv.width*0.075, 60);
+    const ex2 = fx+Math.cos(ang)*len, ey2 = fy+Math.sin(ang)*len;
+    const col = a.fs ? css("--ok") : css("--crit");
+    ctx.lineCap="round";
+    ctx.strokeStyle="rgba(0,0,0,.4)"; ctx.lineWidth=7;
+    ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(ex2,ey2); ctx.stroke();
+    ctx.strokeStyle=col; ctx.lineWidth=4; ctx.setLineDash(a.fs?[]:[9,6]);
+    ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(ex2,ey2); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineCap="butt";
+    ctx.beginPath(); ctx.moveTo(ex2,ey2);
+    ctx.lineTo(ex2-Math.cos(ang-.4)*13, ey2-Math.sin(ang-.4)*13);
+    ctx.lineTo(ex2-Math.cos(ang+.4)*13, ey2-Math.sin(ang+.4)*13);
+    ctx.closePath(); ctx.fillStyle=col; ctx.fill();
+    const lab = a.fs ? "ESCAPE CLEAR" : (a.fa ? "ALREADY ON ROAD" : "FLEES ONTO ROAD");
+    ctx.font="700 11px ui-monospace,Menlo,monospace"; ctx.textAlign="center";
+    const lw2 = ctx.measureText(lab).width + 10;
+    ctx.fillStyle=col; ctx.fillRect(ex2-lw2/2, ey2-27, lw2, 17);
+    ctx.fillStyle="#fff"; ctx.fillText(lab, ex2, ey2-14);
+  }
+}
+
+function verdictOf(frame){
+  const acts = frame.x || [];
+  if (acts.some(a=>a.a==="emit"))         return ["permit","EMITTING", css("--ok")];
+  if (acts.some(a=>a.a==="denied"))       return ["refuse","REFUSED", css("--crit")];
+  if (acts.some(a=>a.a==="escalate"))     return ["hold","ESCALATED", css("--warn")];
+  if (acts.some(a=>a.a==="out_of_range")) return ["hold","OUT OF RANGE", css("--faint")];
+  if (acts.some(a=>a.a==="cooldown"))     return ["hold","QUIET PERIOD", css("--warn")];
+  if (acts.some(a=>a.a==="monitor"))      return ["hold","MONITORING", css("--muted")];
+  return ["","IDLE", css("--muted")];
+}
+
+let pulseT = 0;
+/* ---------------- the board ----------------
+ *
+ * This page replays decisions the Python engine already made. The board runs
+ * its own governor in C. So the bridge sends the SITUATION - distance, group
+ * size, vehicles, person, non-target - and never the verdict. The board has to
+ * reach the same conclusion on its own, and if it ever disagrees with the
+ * panel, that disagreement is the finding, not a glitch to paper over.
+ *
+ * Distances are field metres; the board is scaled 1 cm on the bench to 1 m in
+ * the field, so the number goes across unchanged and is clamped to what the
+ * bench can represent. */
+let port = null, writer = null, lastTx = 0;
+let txSent = {d:null, g:null, v:null, p:false, n:false};
+const enc = new TextEncoder();
+const BENCH_MAX_CM = 70;
+
+function tx(s){ if (writer) writer.write(enc.encode(s + "\n")).catch(()=>{}); }
+
+async function linkBoard(){
+  const b = document.getElementById("linkBtn");
+  if (port){
+    try { writer.releaseLock(); await port.close(); } catch(e){}
+    port = null; writer = null; b.textContent = "Link board"; b.classList.remove("on");
+    return;
+  }
+  if (!("serial" in navigator)){
+    alert("Web Serial needs Chrome or Edge, served over http://127.0.0.1 - "
+        + "a file:// page cannot open a port.");
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({baudRate: 115200});
+    writer = port.writable.getWriter();
+    b.textContent = "Board linked"; b.classList.add("on");
+    txSent = {d:null, g:null, v:null, p:false, n:false};
+    tx("r");
+  } catch(e){
+    alert("Could not open the port: " + e.message
+        + "\nClose the Arduino Serial Monitor first.");
+    port = null; writer = null;
+  }
+}
+document.getElementById("linkBtn").addEventListener("click", linkBoard);
+
+function driveBoard(frame){
+  if (!writer) return;
+  const now = performance.now();
+  if (now - lastTx < 140) return;      // 5 fps of replay, throttled below that
+  lastTx = now;
+
+  const actors = frame.a || [];
+  const target = actors.find(a => a.t);
+  const cm = target ? Math.max(0, Math.min(BENCH_MAX_CM, Math.round(target.d)))
+                    : BENCH_MAX_CM;
+  const group = Math.max(1, actors.filter(a => a.t).length);
+  const veh   = actors.filter(a => a.g === "vehicle" && a.z !== "o").length;
+  const person = actors.some(a => a.l === "person" && a.z !== "o");
+  const nonT   = actors.some(a => !a.t && a.g !== "vehicle" && a.l !== "person"
+                                  && a.z !== "o");
+
+  if (cm     !== txSent.d) { txSent.d = cm;     tx("d" + cm); }
+  if (group  !== txSent.g) { txSent.g = group;  tx("g" + group); }
+  if (veh    !== txSent.v) { txSent.v = veh;    tx("v" + veh); }
+  if (person !== txSent.p) { txSent.p = person; tx("p"); }   // the board toggles
+  if (nonT   !== txSent.n) { txSent.n = nonT;   tx("n"); }
+}
+
+function render(dt){
+  const S0 = src();
+  if (cv.width !== S0.w || cv.height !== S0.h){ cv.width = S0.w; cv.height = S0.h; }
+  const idx = Math.min(Math.floor(fi), S0.frames.length-1);
+  const frame = S0.frames[idx];
+  driveBoard(frame);
+  const S = S0.site;
+
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if (S0.real){
+    const im = imgCache.get(idx);
+    if (im && im.complete) ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    else { ctx.fillStyle="#111"; ctx.fillRect(0,0,cv.width,cv.height); }
+  } else drawSynthBackdrop(S);
+
+  if (show.field && !S0.real){
+    const s = F.step_px; ctx.globalAlpha=.38;
+    for (const c of F.cells){
+      ctx.fillStyle = c.v==="permit"?css("--ok"):c.v==="refuse"?css("--crit"):css("--faint");
+      ctx.fillRect(c.x-s/2, c.y-s/2, s, s);
+    }
+    ctx.globalAlpha=1;
+  }
+  if (show.zones && S0.geo) drawZones(S);
+
+  const [vcls, vtxt, vcol] = (sandbox && !S0.real) ? sandboxVerdict() : verdictOf(frame);
+  const emitting = !sandbox && (frame.x||[]).some(a=>a.a==="emit");
+  pulseT = emitting ? (pulseT + dt*0.9)%1 : 0;
+  if (S0.geo) drawEmitter(S, emitting?pulseT:0);
+
+  if (sandbox && !S0.real){
+    const c = fieldAt(dragPt.x, dragPt.y);
+    const h = 105*Math.max(dragPt.y/719,.25), w = h*1.3;
+    drawActor(S, {b:[dragPt.x-w/2,dragPt.y-h,dragPt.x+w/2,dragPt.y], l:"cow", sp:"Cattle",
+      d:(c?c.d:0), t:true, oh:false, fs:(c?c.flight:true), fa:false,
+      fv:[(dragPt.x-S.emitter_px[0])/600,(S.emitter_px[1]-dragPt.y)/600]}, vcol, true);
+  } else {
+    const ANIM = new Set(["cow","dog","cat","sheep","horse","elephant","person"]);
+    const drawn = frame.a.filter(a => S0.geo || ANIM.has(a.l));
+    for (const a of drawn) drawActor(S, a, vcol, !S0.real, S0.geo);
+    if (!S0.geo){
+      const skipped = frame.a.length - drawn.length;
+      if (skipped > 0){
+        ctx.font = "600 12px ui-monospace,Menlo,monospace"; ctx.textAlign = "left";
+        const msg = skipped + " vehicles detected, not drawn";
+        const w2 = ctx.measureText(msg).width + 12;
+        ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(8, cv.height-62, w2, 18);
+        ctx.fillStyle = "#fff"; ctx.fillText(msg, 14, cv.height-49);
+      }
+    }
+  }
+  if (!S0.geo){
+    // Sits along the bottom, clear of the corner badge, and shrinks to fit any
+    // frame width rather than running off the edge.
+    const msg = "MOVING DASHCAM, NO CALIBRATION - range, zones and flight geometry "
+              + "DISABLED. Species vetoes need none of them.";
+    let fs = 13;
+    ctx.textAlign = "left";
+    do { ctx.font = "600 " + fs + "px ui-monospace,Menlo,monospace"; fs -= 0.5; }
+    while (ctx.measureText(msg).width > cv.width - 28 && fs > 7);
+    const bh = Math.round(fs * 2.1);
+    ctx.fillStyle = "rgba(169,41,31,.92)";
+    ctx.fillRect(0, cv.height - bh, cv.width, bh);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(msg, 12, cv.height - bh / 2 + fs * 0.36);
+  }
+  updatePanel(S0, frame, vcls, vtxt);
+}
+
+function sandboxVerdict(){
+  const c = fieldAt(dragPt.x, dragPt.y);
+  if (!c) return ["hold","OUTSIDE ZONE", css("--muted")];
+  if (c.v==="permit") return ["permit","PERMITTED", css("--ok")];
+  if (c.v==="out_of_range") return ["hold","OUT OF RANGE", css("--faint")];
+  return ["refuse","REFUSED", css("--crit")];
+}
+
+function updatePanel(S0, frame, vcls, vtxt){
+  document.getElementById("verdict").className = "verdict " + vcls;
+  document.getElementById("vbig").textContent = vtxt;
+  let sub = "", vetoes = [], actors = frame.a;
+
+  if (sandbox && !S0.real){
+    const c = fieldAt(dragPt.x, dragPt.y);
+    if (c){
+      sub = c.v==="permit"
+        ? `Adult cow at ${c.d} m. Carrier ${c.khz} kHz at ${c.lvl} dB @1m, the computed minimum, ${(L.ceiling_db-c.lvl).toFixed(1)} dB under the ceiling.`
+        : `Adult cow at ${c.d} m in the ${c.zone} zone.`;
+      vetoes = c.why || [];
+      actors = [{sp:"Cattle (probe)", d:c.d, z:c.zone[0], t:true, fs:c.flight}];
+    } else sub = "Drag the animal onto the road or verge.";
+  } else {
+    const acts = frame.x || [];
+    const em = acts.find(a=>a.a==="emit"), dn = acts.find(a=>a.a==="denied");
+    const oor = acts.find(a=>a.a==="out_of_range"), es = acts.find(a=>a.a==="escalate");
+    if (em) sub = `${em.khz} kHz, ${em.pat}, ${em.lvl} dB @1m -> ${em.rx} dB at the animal. Modelled P(turn) ${em.p}.`;
+    else if (dn) sub = dn.why || "Emission refused.";
+    else if (es) sub = es.why || "Handed to human dispatch.";
+    else if (oor) sub = oor.why || "Beyond the acoustic envelope; traffic warning issued.";
+    else sub = "Monitoring. No emission requested.";
+    vetoes = dn ? (dn.den||[]) : [];
+  }
+  document.getElementById("vsub").textContent = sub;
+  document.getElementById("vetoes").innerHTML = vetoes.length
+    ? vetoes.map(r=>`<div class="veto"><span class="x">x</span><span>${esc(r)}</span></div>`).join("")
+    : `<div class="small">None active.</div>`;
+
+  document.getElementById("actors").innerHTML = actors.length
+    ? actors.slice(0,7).map(a=>{
+        const flags=[];
+        flags.push(a.t?['c-t','target']:a.g==='vehicle'?['c-warn','vehicle']:['c-bad','non-target']);
+        if (a.oh) flags.push(['c-bad','out-hears target']);
+        if (a.juv) flags.push(['c-warn','juvenile']);
+        if (a.grp>L.max_herd) flags.push(['c-bad','group '+a.grp]);
+        // flight assessment is about where a startled ANIMAL would run.
+        // Applied to a car it is meaningless, and on a traffic scenario
+        // it is six red chips saying nothing.
+        if (a.g!=='vehicle') {
+          if (a.fs===false) flags.push(['c-bad','flight -> road']);
+          else if (a.t) flags.push(['c-ok','escape clear']);
+        }
+        flags.push(['c-mut', {c:'carriageway',w:'warning',o:'outside'}[a.z]||a.z]);
+        return `<div class="actor"><div class="row1"><span class="nm">${esc(a.sp)}</span>
+          <span class="dd">${a.d} m</span></div>
+          <div class="flags">${flags.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join("")}</div></div>`;
+      }).join("") + (actors.length>7?`<div class="small">+${actors.length-7} more</div>`:"")
+    : `<div class="small">None in zone.</div>`;
+
+  const su = S0.summary;
+  document.getElementById("totals").innerHTML = `
+    <dt>emitted</dt><dd>${su.total_emission_s.toFixed(2)} s</dd>
+    <dt>incidents</dt><dd>${su.incidents}</dd>
+    <dt>escalations</dt><dd>${su.escalated}</dd>
+    <dt>ledger</dt><dd>${S0.records} ok</dd>`;
+
+  const cls = k => k==="emission"?"em":k==="escalation"?"es":k==="traffic_response"?"tf":"rf";
+  if (S0.key_events){
+    document.getElementById("log").innerHTML = S0.key_events.map(e=>{
+      const p=e.p||{}; let txt="";
+      if (e.kind==="emission") txt=`EMIT ${(p.carrier_hz/1000).toFixed(1)}kHz ${p.level_at_1m_db}dB->${p.predicted_received_db}dB @${p.distance_m}m`;
+      else if (e.kind==="escalation") txt=`ESCALATE ${String(p.reason||"").slice(0,48)}`;
+      else if (e.kind==="traffic_response") txt=`TRAFFIC warn @ ${p.trigger_distance_m}m`;
+      else if (e.kind==="stop") txt=`STOP ${String(p.reason||"").slice(0,48)}`;
+      else txt=`OBSERVED ${p.outcome_name||""}`;
+      return `<div class="${cls(e.kind)}">[${String(e.seq).padStart(3)}] ${esc(txt)}</div>`;
+    }).join("") || `<div style="color:var(--faint)">no key events</div>`;
+  } else {
+    const d = su.denials || {};
+    document.getElementById("log").innerHTML = Object.keys(d).length
+      ? Object.entries(d).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+          `<div class="rf">x${String(v).padStart(3)}  ${esc(k)}</div>`).join("")
+      : `<div style="color:var(--faint)">no vetoes recorded</div>`;
+  }
+}
+
+/* -------- loop -------- */
+function loop(ts){
+  const dt = Math.min((ts-last)/1000,.1); last = ts;
+  if (view !== "out"){
+    const S0 = src();
+    if (playing && !sandbox){ fi += dt*S0.fps; if (fi >= S0.frames.length) fi = 0; }
+    document.getElementById("scrub").value = (fi/S0.frames.length)*100;
+    document.getElementById("tmark").textContent =
+      (S0.frames[Math.min(Math.floor(fi),S0.frames.length-1)].t).toFixed(1)+" s";
+    render(dt);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* -------- controls -------- */
+document.getElementById("play").onclick = e => {
+  playing = !playing; e.target.textContent = playing?"Pause":"Play"; };
+document.getElementById("step").onclick = () => {
+  playing=false; document.getElementById("play").textContent="Play";
+  fi = Math.min(fi+1, src().frames.length-1); };
+document.getElementById("restart").onclick = () => { fi = 0; };
+document.getElementById("scrub").oninput = e => {
+  playing=false; document.getElementById("play").textContent="Play";
+  fi = (e.target.value/100)*src().frames.length; };
+sel.onchange = e => { scenName = e.target.value; fi = 0; setNote(); };
+document.getElementById("sandbox").onclick = e => {
+  sandbox = !sandbox; e.target.classList.toggle("on", sandbox);
+  e.target.textContent = sandbox?"Exit sandbox":"Sandbox";
+  if (sandbox){ show.field = true; document.getElementById("t-field").classList.add("on"); }
+};
+for (const b of document.querySelectorAll(".toggles button")){
+  b.onclick = () => { show[b.dataset.t] = !show[b.dataset.t]; b.classList.toggle("on", show[b.dataset.t]); };
+}
+function canvasPt(ev){
+  const r = cv.getBoundingClientRect(); const p = ev.touches?ev.touches[0]:ev;
+  return { x:(p.clientX-r.left)*cv.width/r.width, y:(p.clientY-r.top)*cv.height/r.height };
+}
+cv.addEventListener("pointerdown", e=>{ if(sandbox){ drag=true; dragPt=canvasPt(e); cv.setPointerCapture(e.pointerId);} });
+cv.addEventListener("pointermove", e=>{ if(sandbox&&drag) dragPt=canvasPt(e); });
+cv.addEventListener("pointerup", ()=>{ drag=false; });
+
+/* -------- tabs -------- */
+function setNote(){
+  const n = document.getElementById("note");
+  if (view === "real"){
+    n.innerHTML = `<strong>Real 1080p footage: stray cattle on Prithviraj Road, Lutyens Delhi.</strong>
+      Boxes are live YOLO output; vetoes are the real governor. Over these
+      ${FP.frames.length} frames the system emitted
+      <strong>${FP.summary.total_emission_s.toFixed(1)} seconds</strong> across
+      ${FP.summary.incidents} incidents &mdash; because this street is never empty of
+      people, dogs and grouped animals, and each of those is an absolute veto.
+      On a street like this the correct product is the traffic-warning layer, and
+      the system says so rather than finding a reason to fire.
+      <br><br><strong>Note what is switched off.</strong> This is a dashcam from a
+      moving car; our system assumes a fixed, calibrated pole camera. So range,
+      zones and flight geometry are disabled here rather than faked &mdash; and the
+      species vetoes still work, because they never needed geometry.
+      Also visible: the detector labels some cattle
+      <em>horse</em> and <em>elephant</em>. That is hazard H19 on real data, and it
+      fails safe: every wrong label is still a non-target, so it vetoes too.`;
+  } else {
+    n.innerHTML = `<strong>${esc(scenName)}.</strong> ${esc(D.scenarios[scenName].description)}`;
+  }
+}
+function setView(v){
+  view = v; fi = 0;
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("on", b.dataset.v===v);
+  document.getElementById("view-play").classList.toggle("hidden", v==="out");
+  document.getElementById("view-out").classList.toggle("hidden", v!=="out");
+  sel.classList.toggle("hidden", v!=="scen");
+  document.getElementById("sandbox").classList.toggle("hidden", v!=="scen");
+  document.getElementById("t-field").classList.toggle("hidden", v!=="scen");
+  document.getElementById("badge").textContent = v==="real"
+    ? "Real footage - uncalibrated, distances indicative"
+    : "Simulated - no hardware, no animals";
+  document.getElementById("credit").textContent = v==="real"
+    ? `${FP.source} - ${FP.attribution} - ${FP.licence}` : "";
+  if (v!=="out") setNote();
+  if (v==="real"){ sandbox=false; document.getElementById("sandbox").classList.remove("on"); }
+}
+for (const b of document.querySelectorAll("nav button")) b.onclick = () => setView(b.dataset.v);
+document.getElementById("hdrnote").innerHTML =
+  "Real detections and real governor decisions, replayed. The browser looks up verdicts the Python engine produced; it contains no decision logic of its own.";
+
+/* ================= OUTCOMES ================= */
+const E = OUT.ensemble, A = E.active, C = E.control;
+document.getElementById("nruns").textContent = E.n_runs_per_arm;
+
+document.querySelector("#outtable tbody").innerHTML = [
+  ["Road stayed clear","clear_rate", true],
+  ["Animal reached the road","cross_rate", false],
+  ["Panicked (counted as failure)","panic_rate", false],
+  ["Handed to dispatch","escalation_rate", null],
+].map(([lbl,k,good])=>{
+  const a=A[k], c=C[k];
+  const col = good===null ? "var(--muted)" : (good ? (a>c?"var(--ok)":"var(--crit)") : (a<c?"var(--ok)":"var(--crit)"));
+  return `<tr><td>${lbl}</td><td class="num" style="color:${col}">${(a*100).toFixed(1)}%</td>
+    <td class="num" style="color:var(--muted)">${(c*100).toFixed(1)}%</td></tr>`;
+}).join("");
+
+function bars(){
+  const W=520,H=210,L0=124,R=18,T=16,B=34;
+  const rows=[["Road stayed clear",A.clear_rate,C.clear_rate],
+              ["Reached the road",A.cross_rate,C.cross_rate]];
+  let g="";
+  for(let p=0;p<=1.001;p+=0.25){
+    const x=L0+(W-L0-R)*p;
+    g+=`<line x1="${x}" y1="${T}" x2="${x}" y2="${H-B}" stroke="${css('--grid')||css('--line')}"/>`;
+    g+=`<text x="${x}" y="${H-B+16}" fill="${css('--faint')}" font-size="10.5" font-family="ui-monospace,monospace" text-anchor="middle">${(p*100).toFixed(0)}%</text>`;
+  }
+  rows.forEach((r,i)=>{
+    const y=T+16+i*80;
+    g+=`<text x="${L0-10}" y="${y+16}" fill="${css('--body')}" font-size="11.5" text-anchor="end">${r[0]}</text>`;
+    g+=`<rect x="${L0}" y="${y}" width="${(W-L0-R)*r[1]}" height="20" fill="${css('--accent')}"/>`;
+    g+=`<text x="${L0+(W-L0-R)*r[1]+6}" y="${y+15}" fill="${css('--accent')}" font-size="11" font-family="ui-monospace,monospace">${(r[1]*100).toFixed(0)}% on</text>`;
+    g+=`<rect x="${L0}" y="${y+24}" width="${(W-L0-R)*r[2]}" height="20" fill="${css('--faint')}" opacity=".65"/>`;
+    g+=`<text x="${L0+(W-L0-R)*r[2]+6}" y="${y+39}" fill="${css('--muted')}" font-size="11" font-family="ui-monospace,monospace">${(r[2]*100).toFixed(0)}% control</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+document.getElementById("chart-out").innerHTML = bars();
+
+/* one encounter, distance over time */
+function traceChart(){
+  const W=520,H=250,L0=44,R=16,T=14,B=38;
+  const turned = OUT.traces_active.find(t=>t.code==="T" && t.emissions>=2)
+    || OUT.traces_active.find(t=>t.code==="T" && t.emissions>0) || OUT.traces_active[0];
+  const crossed = OUT.traces_control.find(t=>t.code==="C") || OUT.traces_control[0];
+  const all=[...turned.trace,...crossed.trace];
+  const maxT=Math.max(...all.map(p=>p.t)), maxD=Math.max(...all.map(p=>p.d))*1.08;
+  const x=t=>L0+(W-L0-R)*(t/Math.max(maxT,1)), y=d=>T+(H-T-B)*(1-d/Math.max(maxD,1));
+  let g="";
+  for(let k=0;k<=4;k++){
+    const d=maxD*k/4;
+    g+=`<line x1="${L0}" y1="${y(d)}" x2="${W-R}" y2="${y(d)}" stroke="${css('--line')}"/>`;
+    g+=`<text x="${L0-7}" y="${y(d)+4}" fill="${css('--faint')}" font-size="10" font-family="ui-monospace,monospace" text-anchor="end">${d.toFixed(0)}m</text>`;
+  }
+  // carriageway band
+  g+=`<rect x="${L0}" y="${y(12)}" width="${W-L0-R}" height="${H-B-y(12)}" fill="${css('--crit')}" opacity=".12"/>`;
+  g+=`<text x="${W-R-4}" y="${y(12)+13}" fill="${css('--crit')}" font-size="10" font-family="ui-monospace,monospace" text-anchor="end">CARRIAGEWAY</text>`;
+  const line=(tr,col,dash)=>{
+    let p="";
+    tr.trace.forEach((q,i)=>{p+=(i?"L":"M")+x(q.t)+","+y(q.d)+" ";});
+    let s=`<path d="${p}" fill="none" stroke="${col}" stroke-width="2.4"${dash?' stroke-dasharray="6 4"':''}/>`;
+    for (const q of tr.trace) if (q.emitting)
+      s+=`<circle cx="${x(q.t)}" cy="${y(q.d)}" r="4.5" fill="${css('--accent')}"/>`+
+         `<text x="${x(q.t)}" y="${y(q.d)-9}" fill="${css('--accent')}" font-size="9" font-family="ui-monospace,monospace" text-anchor="middle">${q.rx_db||""}dB</text>`;
+    return s;
+  };
+  g+=line(crossed, css('--faint'), true);
+  g+=line(turned, css('--ok'), false);
+  g+=`<text x="${W/2}" y="${H-6}" fill="${css('--faint')}" font-size="10.5" font-family="ui-monospace,monospace" text-anchor="middle">seconds since detection</text>`;
+  g+=`<line x1="${W-150}" y1="${T+8}" x2="${W-126}" y2="${T+8}" stroke="${css('--ok')}" stroke-width="2.4"/>`;
+  g+=`<text x="${W-121}" y="${T+12}" fill="${css('--body')}" font-size="10" font-family="ui-monospace,monospace">emitter on</text>`;
+  g+=`<line x1="${W-150}" y1="${T+24}" x2="${W-126}" y2="${T+24}" stroke="${css('--faint')}" stroke-width="2.4" stroke-dasharray="6 4"/>`;
+  g+=`<text x="${W-121}" y="${T+28}" fill="${css('--muted')}" font-size="10" font-family="ui-monospace,monospace">control</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+document.getElementById("chart-trace").innerHTML = traceChart();
+document.getElementById("tracecap").innerHTML =
+  `Two individual encounters. <strong style="color:var(--ok)">Green</strong>: the emitter fires (dots mark each burst, labelled with the level actually arriving at the animal) and the animal turns before the carriageway. <strong style="color:var(--muted)">Dashed grey</strong>: the control arm, same geometry, no sound &mdash; it walks straight on. This is the mechanism the earlier version was missing.`;
+
+/* sensitivity */
+function sensChart(){
+  const S=OUT.sensitivity, W=520,H=230,L0=44,R=16,T=14,B=40;
+  const x=i=>L0+(W-L0-R)*i/(S.length-1), y=p=>T+(H-T-B)*(1-p/0.6);
+  let g="";
+  for(let p=0;p<=0.601;p+=0.15){
+    g+=`<line x1="${L0}" y1="${y(p)}" x2="${W-R}" y2="${y(p)}" stroke="${css('--line')}"/>`;
+    g+=`<text x="${L0-7}" y="${y(p)+4}" fill="${css('--faint')}" font-size="10" font-family="ui-monospace,monospace" text-anchor="end">${(p*100).toFixed(0)}%</text>`;
+  }
+  let pa="",pc="";
+  S.forEach((r,i)=>{pa+=(i?"L":"M")+x(i)+","+y(r.active_clear)+" "; pc+=(i?"L":"M")+x(i)+","+y(r.control_clear)+" ";});
+  g+=`<path d="${pc}" fill="none" stroke="${css('--faint')}" stroke-width="2" stroke-dasharray="6 4"/>`;
+  g+=`<path d="${pa}" fill="none" stroke="${css('--accent')}" stroke-width="2.6"/>`;
+  S.forEach((r,i)=>{
+    g+=`<circle cx="${x(i)}" cy="${y(r.active_clear)}" r="4" fill="${r.separable?css('--accent'):css('--crit')}"/>`;
+    g+=`<text x="${x(i)}" y="${H-B+16}" fill="${css('--faint')}" font-size="10" font-family="ui-monospace,monospace" text-anchor="middle">${r.motivation}</text>`;
+    if(!r.separable) g+=`<text x="${x(i)}" y="${y(r.active_clear)-11}" fill="${css('--crit')}" font-size="9" font-family="ui-monospace,monospace" text-anchor="middle">n.s.</text>`;
+  });
+  g+=`<text x="${W/2}" y="${H-6}" fill="${css('--faint')}" font-size="10.5" font-family="ui-monospace,monospace" text-anchor="middle">how badly the animal wants to cross</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+document.getElementById("chart-sens").innerHTML = sensChart();
+
+const T2 = E.traffic;
+document.querySelector("#traftable tbody").innerHTML = [
+  ["Animal reaches road, control", (T2.control_cross_rate*100).toFixed(1)+"%"],
+  ["Animal reaches road, active", (T2.active_cross_rate*100).toFixed(1)+"%"],
+  ["Fewer blockages", (T2.relative_reduction*100).toFixed(1)+"%"],
+  ["Person-hours saved / approach", T2.person_hours_saved_per_approach],
+  ["INR saved / approach", T2.cost_inr_saved_per_approach],
+].map(([k,v])=>`<tr><td>${k}</td><td class="num">${v}</td></tr>`).join("");
+document.getElementById("trafcap").textContent = T2.caveat;
+
+document.getElementById("headline").innerHTML =
+  `<div class="lbl">The result</div><p><strong>${esc(E.difference.reading)}</strong></p>
+   <p>Panic is scored as a failure, never a clearance &mdash; a configuration that clears the road by frightening animals into bolting does worse here, not better. Observed panic rate: ${(A.panic_rate*100).toFixed(1)}%, mean emission ${A.mean_emission_s} s per encounter.</p>`;
+document.getElementById("timingnote").textContent = E.timing_note;
+document.getElementById("prov").textContent = E.provenance;
+
+setView("real");
+requestAnimationFrame(loop);
+</script>

@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 from . import __version__
@@ -582,22 +584,78 @@ def cmd_sim(args) -> int:
     print(f"  field cells  {cells}   {verdicts}")
     print(f"  written      {args.out}")
 
+    # The built page is a few megabytes of data wrapped around 45 KB of code,
+    # so only the code is tracked. The page is assembled here from the
+    # template plus whichever data files exist, which is what makes the
+    # console reproducible from a clean checkout instead of being a binary
+    # that has to be carried around by hand.
     page = Path(args.page)
-    if page.exists():
-        html = page.read_text(encoding="utf-8")
-        marker = '<script id="sim" type="application/json">'
-        end = "</script>"
+    tmpl = Path(args.template)
+    # Take the template whenever it is newer than the built page, not only when
+    # the page is missing.
+    #
+    # It used to be "only when missing", which meant every edit to the
+    # template - the code, the part under review - was silently ignored on any
+    # machine that already had a built page. You changed the console, rebuilt,
+    # reloaded, and studied the old code. The page is fully derived from the
+    # template plus the payload files, so there is nothing in it to protect.
+    stale = (tmpl.exists() and page.exists()
+             and tmpl.stat().st_mtime > page.stat().st_mtime)
+    if not page.exists() or stale:
+        if not tmpl.exists():
+            print(f"  note: neither {page} nor {tmpl} found, wrote JSON only")
+            return 0
+        missing = [p for p in ("dashboard/footage.json", "dashboard/outcome.json")
+                   if not Path(p).exists()]
+        if missing and stale:
+            # Rebuilding from the template drops whatever is only in the page.
+            print(f"  WARNING: rebuilding from {tmpl} but {', '.join(missing)} "
+                  f"is missing - those tabs will be empty")
+        page.write_text(tmpl.read_text(encoding="utf-8"), encoding="utf-8")
+        why = "template is newer" if stale else "no page yet"
+        print(f"  page         built from {tmpl}  ({why})")
+
+    html = page.read_text(encoding="utf-8")
+    end = "</script>"
+    for pid, src_path in (("sim", args.out),
+                          ("foot", "dashboard/footage.json"),
+                          ("outc", "dashboard/outcome.json")):
+        data_file = Path(src_path)
+        marker = f'<script id="{pid}" type="application/json">'
         i = html.find(marker)
-        if i >= 0:
-            j = html.find(end, i)
-            payload = Path(args.out).read_text(encoding="utf-8")
-            html = html[: i + len(marker)] + payload + html[j:]
-            page.write_text(html, encoding="utf-8")
-            print(f"  injected     {page}  ({page.stat().st_size / 1048576:.2f} MB)")
-        else:
-            print(f"  WARNING: no payload marker in {page}; left unchanged")
+        if i < 0:
+            print(f"  WARNING: no '{pid}' payload marker in {page}")
+            continue
+        j = html.find(end, i)
+        current = html[i + len(marker): j]
+        if not data_file.exists():
+            # Never blank a payload that is already in the page just because
+            # its source file is missing - that silently guts a working demo.
+            if not current.strip():
+                print(f"  note: {pid:5} has no data ({data_file} missing)")
+            continue
+        html = html[: i + len(marker)] + data_file.read_text(encoding="utf-8") + html[j:]
+    # Stamp the build. Without it there is no way to tell a freshly rebuilt
+    # 6.6 MB page from the copy the browser kept, and reading yesterday's
+    # verdicts while believing they are today's is the expensive kind of wrong.
+    stamp = time.strftime("%Y-%m-%d %H:%M")
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=5)
+        if sha.returncode == 0 and sha.stdout.strip():
+            stamp += "  " + sha.stdout.strip()
+    except Exception:
+        pass                            # a stamp without a sha still dates it
+    a, b = "<!--BUILD-->", "<!--/BUILD-->"
+    i, j = html.find(a), html.find(b)
+    if i >= 0 and j > i:
+        html = html[: i + len(a)] + stamp + html[j:]
     else:
-        print(f"  note: {page} not found, wrote JSON only")
+        print("  WARNING: no build stamp marker in the page")
+
+    page.write_text(html, encoding="utf-8")
+    print(f"  injected     {page}  ({page.stat().st_size / 1048576:.2f} MB)")
+    print(f"  build        {stamp}")
     print()
     print("Open the page in any browser. It is fully self-contained.")
     return 0
@@ -730,6 +788,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("sim", help="rebuild the interactive browser simulator")
     s.add_argument("--out", default="dashboard/sim.json")
     s.add_argument("--page", default="dashboard/simulator.html")
+    s.add_argument("--template", default="dashboard/simulator_template.html",
+                   help="code-only page used when --page does not exist yet")
     s.add_argument("--step", type=int, default=16, help="decision-field grid, px")
     s.set_defaults(func=cmd_sim)
 

@@ -7,8 +7,9 @@ room you do not control. Pick one; they show the same rules.
 
 ## 1. On screen, no hardware — the one to present
 
-Open `hardware/bench.html` and press **Run the demo**. Nine narrated beats,
-about a minute, driving itself.
+Open `hardware/bench.html` and press **Run the demo**. Twelve narrated beats,
+about a minute and a half, driving itself - one for every reason the governor
+can refuse, plus the two cases where it permits.
 
 Nothing to install, no cable, no port. Every limit on that page is parsed out
 of `hardware/wokwi_esp32/gaukavach_esp32.ino` when the page is generated, so it
@@ -27,9 +28,18 @@ Web Serial needs a secure origin. A `file://` page is not one and neither is an
 embedded frame, but `http://127.0.0.1` is — so the page has to be **served**,
 not opened off the disk. That is the only reason the launcher exists.
 
-    cd hardware
-    python -m http.server 8765 --bind 127.0.0.1
-    # then open http://127.0.0.1:8765/bench.html
+    python tools/serve.py
+    # then open http://127.0.0.1:8765/hardware/bench.html
+
+It prints a link to every page. Use it rather than `python -m http.server`:
+that one sends `Last-Modified` and no `Cache-Control`, so a browser may serve
+its cached copy without asking the server at all. These pages are regenerated
+constantly, so the result is that you rebuild, reload, and study the previous
+build. `tools/serve.py` sends `no-store` and withholds `Last-Modified`, so a
+reload always refetches.
+
+Both pages carry a **build stamp** — date, time and commit — so you can see
+which build is on screen instead of guessing.
 
 Click **Connect the board**, choose the ESP32's COM port, then **Run the demo**.
 Chrome or Edge only; Firefox has no Web Serial.
@@ -54,6 +64,8 @@ core 3.x, no libraries. Then open the Serial Monitor at **115200** and type:
 | `n`    | dog or goat in the cone, refused                 |
 | `g5`   | herd of five, refused                            |
 | `g1`   | back under the group limit                       |
+| `v6`   | six vehicles in the zone, refused                |
+| `v0`   | clear road again                                 |
 | `d20`  | already at the carriageway, refused              |
 | `d160` | beyond the acoustic envelope, refused            |
 | `e`    | emergency stop, latched                          |
@@ -138,3 +150,25 @@ governor limits, that no LED in any diagram is reversed, that every wire in the
 Wokwi manual is listed exactly once, and that no shipped page contains a byte
 above 127 — because these pages are fragments and a browser guessing the
 charset renders mojibake, which reads as a broken page.
+
+---
+
+## The operations console
+
+`dashboard/simulator.html` is the wider view: real footage, the veto scenarios
+that cannot be filmed, and the outcome study. It is not in git - it is 6.5 MB
+of generated data wrapped around 45 KB of code, and only the code is tracked.
+Build it with
+
+    python -m gaukavach sim
+
+which takes `dashboard/simulator_template.html` and injects the three payloads
+(`sim.json`, `footage.json`, `outcome.json`). Missing payloads are left alone
+rather than blanked, so a partial rebuild degrades a tab instead of gutting the
+page.
+
+Its **Link board** button drives the ESP32 from a replayed scenario. It sends
+the situation - distance, group size, vehicles, person, non-target - and never
+the verdict, so the board reaches its own conclusion in C. If the lamps ever
+disagree with the panel, that disagreement is a finding about one of the two
+implementations, which is the entire reason it is wired that way.

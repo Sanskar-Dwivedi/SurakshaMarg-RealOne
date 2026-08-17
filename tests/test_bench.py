@@ -88,3 +88,31 @@ def test_generated_page_is_pure_ascii():
         pytest.skip("run tools/make_bench.py first")
     bad = {c for c in PAGE.read_text(encoding="utf-8") if ord(c) > 127}
     assert not bad, f"non-ASCII would be mis-decoded by the host: {bad}"
+
+
+def test_every_demo_beat_has_a_world():
+    """
+    Each guided-demo beat names the world it wants; demoBeat looks that name up
+    in W. A beat whose name is missing from W sets up nothing and shows the
+    previous beat's scene under the new caption.
+
+    This is not hypothetical. The beats were once matched on array index, so
+    inserting one in the middle reassigned every later beat - the E-stop beat
+    silently became the quiet period. Names fixed that; this keeps them paired.
+    """
+    page = PAGE.read_text(encoding="utf-8")
+    beats = set(re.findall(r'"(\w+)"\],?\n', page))
+    modes = set(re.findall(r'^\s{4}(\w+):\s*\{', page, re.M))
+    named = {m.group(1) for m in re.finditer(r',\s*"(\w+)"\],', page)}
+    missing = named - modes
+    assert not missing, f"demo beats with no world in W: {sorted(missing)}"
+    assert "traffic" in modes, "the traffic veto has no beat in the guided demo"
+
+
+def test_traffic_veto_reaches_the_board():
+    """The page must send the vehicle count over USB, or the board reaches a
+    different verdict from the page that is supposedly driving it."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert 'txt("v" + traffic)' in page, "vehicle count is never sent to the board"
+    assert '"v": null' in page or "v: null" in page, (
+        "the sent-cache has no v field, so the first vehicle count is skipped")

@@ -50,6 +50,7 @@ class Denial(str, Enum):
     FLIGHT_INTO_HAZARD = "fleeing the emitter would take the animal onto the carriageway"
     NO_ESCAPE_ROUTE = "the animal has no viable escape corridor away from the road"
     HERD_SIZE = "group is large enough that a startle could cascade through it"
+    TRAFFIC_PRESENT = "traffic is in the zone and a startled animal could bolt into it"
     JUVENILE_PRESENT = "a juvenile animal is present in the group"
     IMMOBILE_ANIMAL = "the animal did not move after a previous emission and may be restrained"
     DOWNED_ANIMAL = "the animal may be recumbent, sick or injured"
@@ -115,6 +116,7 @@ class SceneContext:
     immobile_after_emission: bool = False
     flight_enters_hazard: bool = False
     already_in_hazard: bool = False
+    vehicles_in_zone: int = 0
     escape_corridor_m: float = 999.0
     sensitive_receptors_nearby: bool = False
 
@@ -201,6 +203,15 @@ class Governor:
         elif scene.flight_enters_hazard:
             denials.append(Denial.FLIGHT_INTO_HAZARD)
             notes.append("predicted flight path intersects the carriageway")
+
+        if scene.vehicles_in_zone > ev.get("max_vehicles_in_zone_for_emission"):
+            denials.append(Denial.TRAFFIC_PRESENT)
+            notes.append(
+                f"{scene.vehicles_in_zone} vehicles in the zone; a startle here "
+                f"is a bet on which way the animal runs, and the losing side of "
+                f"that bet is a collision. Warn the traffic instead - that works "
+                f"without the animal's cooperation"
+            )
 
         if scene.escape_corridor_m < ev.get("min_escape_corridor_m"):
             denials.append(Denial.NO_ESCAPE_ROUTE)

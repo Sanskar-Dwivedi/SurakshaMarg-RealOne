@@ -291,3 +291,52 @@ def test_no_scenario_with_a_nontarget_animal_ever_emits(name):
     assert not engine.ledger.of_kind("emission"), (
         f"{name} emitted while a non-target species was present"
     )
+
+
+def test_traffic_in_the_zone_blocks_emission():
+    """
+    The rule that reads backwards: it refuses at the moment a collision is
+    possible. The emitter startles rather than steers, so with vehicles beside
+    the animal a refusal plus a traffic warning beats a gamble on which way it
+    runs.
+    """
+    gov = Governor(SITE_ATM)
+    n = ev.get("max_vehicles_in_zone_for_emission") + 3
+    auth = gov.request(
+        "COW-1", 24_000.0, 12.0, 0.5, now_t=100.0,
+        scene=SceneContext(vehicles_in_zone=n),
+    )
+    assert not auth.granted
+    assert Denial.TRAFFIC_PRESENT in auth.denials
+
+
+def test_a_clear_road_does_not_trigger_the_traffic_veto():
+    """The veto must be about traffic, not a blanket refusal that happens to
+    look safe. At or below the threshold it must not appear at all."""
+    gov = Governor(SITE_ATM)
+    auth = gov.request(
+        "COW-2", 24_000.0, 12.0, 0.5, now_t=100.0,
+        scene=SceneContext(
+            vehicles_in_zone=ev.get("max_vehicles_in_zone_for_emission")),
+    )
+    assert Denial.TRAFFIC_PRESENT not in auth.denials
+
+
+def test_the_traffic_scenario_refuses_for_exactly_one_reason():
+    """
+    The scenario earns its place in the console only if traffic is the sole
+    veto. If a second veto fires, the scenario stops demonstrating this rule
+    and starts demonstrating whichever rule happens to sort first.
+    """
+    from gaukavach.scenario import SCENARIOS
+    assert "traffic-present" in SCENARIOS
+
+    from gaukavach.simulate import record_scenario
+    from gaukavach.detect import DEMO_SITE
+    rec = record_scenario(SCENARIOS["traffic-present"], DEMO_SITE, SITE_ATM)
+    reasons = {d for f in rec["frames"] for x in f["x"] for d in x.get("den", [])}
+    assert Denial.TRAFFIC_PRESENT.value in reasons
+    assert reasons == {Denial.TRAFFIC_PRESENT.value}, (
+        f"traffic scenario also fires: {reasons - {Denial.TRAFFIC_PRESENT.value}}")
+    emitted = [x for f in rec["frames"] for x in f["x"] if x["a"] == "emit"]
+    assert not emitted, "the traffic scenario must never emit"

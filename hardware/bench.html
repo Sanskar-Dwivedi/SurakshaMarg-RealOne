@@ -206,6 +206,14 @@ enforces the firmware's rules rather than an approximation of them.</p>
     <span class="chip" data-g="5">5 &mdash; herd, refuses</span>
   </div>
 
+  <label>Vehicles in the zone <b><span id="vehTxt">0</span> on the road</b></label>
+  <input type="range" id="veh" min="0" max="9" step="1" value="0">
+  <div class="zones"><span>0</span><span>limit is 3</span><span>9</span></div>
+  <div class="presets" id="vPresets">
+    <span class="chip" data-v="0">0 &mdash; clear road</span>
+    <span class="chip" data-v="6">6 &mdash; busy, refuses</span>
+  </div>
+
   <div class="btns">
     <div class="btn" id="bPerson">PERSON<small>hold &mdash; key 1</small></div>
     <div class="btn" id="bNon">DOG / GOAT<small>hold &mdash; key 2</small></div>
@@ -252,10 +260,10 @@ figures are in the table below.</p>
 <table><tbody><tr><td class="k">Carrier</td><td class="v">25.0 kHz</td></tr><tr><td class="k">Envelope ramp</td><td class="v">25 ms raised cosine</td></tr><tr><td class="k">Max single activation</td><td class="v">6 s  &rarr; demo 3.0 s</td></tr><tr><td class="k">Enforced quiet period</td><td class="v">20 s  &rarr; demo 10.0 s</td></tr><tr><td class="k">Daily exposure budget</td><td class="v">120 s  &rarr; demo 60 s</td></tr><tr><td class="k">Escalate after</td><td class="v">25 s  &rarr; demo 12.5 s</td></tr><tr><td class="k">Max group size</td><td class="v">3 animals</td></tr><tr><td class="k">Max attempts</td><td class="v">3</td></tr><tr><td class="k">Bench scale</td><td class="v">1.0 cm per field metre</td></tr><tr><td class="k">Carriageway line</td><td class="v">12 m  (12 cm on the bench)</td></tr><tr><td class="k">Acoustic envelope</td><td class="v">42.8 m  (43 cm)</td></tr></tbody></table>
 </div>
 
-<p class="foot">Regenerate with <code>python tools/make_bench.py</code>.</p>
+<p class="foot">Regenerate with <code>python tools/make_bench.py</code>.<br>build eeca1a0+local</p>
 </div>
 <script>
-const K = {"MAX_GROUP": 3.0, "MAX_ACTIVATION_MS": 6000.0, "MIN_SILENCE_MS": 20000.0, "DAILY_BUDGET_MS": 120000.0, "ESCALATE_AFTER_MS": 25000.0, "MAX_ATTEMPTS": 3.0, "CARRIER_HZ": 25000.0, "DEMO_SPEED": 2.0, "RAMP_MS": 25.0, "DESK_SCALE": 1.0, "RANGE_MAX_M": 42.8, "LINE_M": 12.0, "SEEN_MAX_CM": 70.0};
+const K = {"MAX_GROUP": 3.0, "MAX_TRAFFIC": 3.0, "MAX_ACTIVATION_MS": 6000.0, "MIN_SILENCE_MS": 20000.0, "DAILY_BUDGET_MS": 120000.0, "ESCALATE_AFTER_MS": 25000.0, "MAX_ATTEMPTS": 3.0, "CARRIER_HZ": 25000.0, "DEMO_SPEED": 2.0, "RAMP_MS": 25.0, "DESK_SCALE": 1.0, "RANGE_MAX_M": 42.8, "LINE_M": 12.0, "SEEN_MAX_CM": 70.0};
 const SEEN_MAX = K.SEEN_MAX_CM;
 
 const el = (id) => document.getElementById(id);
@@ -296,7 +304,7 @@ function say(cls, text) {
 }
 
 // ---- inputs
-const dist = el("dist"), grp = el("grp");
+const dist = el("dist"), grp = el("grp"), veh = el("veh");
 let person = false, nonTarget = false;
 
 function bindHold(node, set) {
@@ -315,12 +323,14 @@ document.querySelectorAll("[data-d]").forEach((c) => {
 });
 document.querySelectorAll("[data-g]").forEach((c) => {
   c.addEventListener("click", () => { grp.value = c.dataset.g; });
+for (const c of document.querySelectorAll("#vPresets .chip"))
+  c.addEventListener("click", () => { veh.value = c.dataset.v; });
 });
 
 el("bStop").addEventListener("click", () => { S.estop = true; });
 el("bReset").addEventListener("click", () => {
   boot(false);
-  dist.value = SEEN_MAX; grp.value = 1;
+  dist.value = SEEN_MAX; grp.value = 1; veh.value = 0;
   person = false; nonTarget = false;
   el("bPerson").classList.remove("held");
   el("bNon").classList.remove("held");
@@ -372,8 +382,10 @@ function tick() {
   farRefusal = false;        // cleared every pass, before any early return
   const cm = +dist.value;
   const group = +grp.value;
+  const traffic = +veh.value;
 
   el("cmTxt").textContent = cm;
+  el("vehTxt").textContent = veh.value;
   el("grpTxt").textContent = group;
   mirror(cm, group);
   document.querySelectorAll("[data-d]").forEach(
@@ -428,6 +440,7 @@ function tick() {
   else if (group > K.MAX_GROUP)     deny = "group large enough that a startle could cascade";
   else if (metres > K.RANGE_MAX_M)  { deny = "beyond the acoustic envelope";
                                        farRefusal = true; }
+  else if (traffic > K.MAX_TRAFFIC) deny = "traffic in the zone - a startled animal could bolt into it";
   else if (metres <= K.LINE_M)      deny = "already at the carriageway - fleeing would cross it";
   else if (S.state === "COOLDOWN" &&
            (t - S.lastEmissionEnd) < scaled(K.MIN_SILENCE_MS))
@@ -521,7 +534,7 @@ function paint(cm, group) {
  * not from a file:// page or an embedded frame. Use the launcher.
  */
 let port = null, writer = null;
-let sent = {d: null, g: null, p: false, n: false, e: false};
+let sent = {d: null, g: null, v: null, p: false, n: false, e: false};
 let lastSend = 0;
 const enc = new TextEncoder();
 
@@ -577,7 +590,7 @@ async function linkBoard() {
     el("linkBtn").textContent = "Board connected";
     el("linkBtn").classList.add("linked");
     say("p", "board connected - the real lamps now follow this page");
-    sent = {d: null, g: null, p: false, n: false, e: false};
+    sent = {d: null, g: null, v: null, p: false, n: false, e: false};
     txt("r");
   } catch (e) {
     say("r", "could not open the port: " + e.message
@@ -587,12 +600,14 @@ async function linkBoard() {
 }
 
 function mirror(cm, group) {
+  const traffic = +veh.value;
   if (!writer) return;
   const now = performance.now();
   if (now - lastSend < 120) return;      // dragging a slider must not flood it
   lastSend = now;
   if (cm !== sent.d)        { sent.d = cm;        txt("d" + cm); }
   if (group !== sent.g)     { sent.g = group;     txt("g" + group); }
+  if (traffic !== sent.v)   { sent.v = traffic;   txt("v" + traffic); }
   if (person !== sent.p)    { sent.p = person;    txt("p"); }
   if (nonTarget !== sent.n) { sent.n = nonTarget; txt("n"); }
   if (S.estop !== sent.e)   { sent.e = S.estop;   txt(S.estop ? "e" : "r"); }
@@ -607,26 +622,43 @@ el("linkBtn").addEventListener("click", linkBoard);
  * argument in order - detect, then every reason the system declines - and each
  * one carries the line to say while it is on screen. */
 const DEMO = [
-  [3000, "The road is clear", "Nothing detected. The system is armed and quiet."],
+  [3000, "The road is clear", "Nothing detected. The system is armed and quiet.",
+   "clear"],
   [12000, "An animal approaches",
    "Detected at 25 metres. It permits - then cuts itself off after six "
    + "seconds, waits out the quiet period, and tries again. Every green "
-   + "flash is a fresh decision.", "pulse"],
+   + "flash is a fresh decision.", "approach"],
   [5200, "A person is in the cone",
-   "Absolute veto. Emission stops mid-burst, and it says why."],
+   "Absolute veto. Emission stops mid-burst, and it says why.", "person"],
+  [5200, "A dog or a goat is in the cone",
+   "The second absolute veto. Frequency gives no species selectivity - cattle "
+   + "rank sixth of seven audiograms - so the selectivity has to come from the "
+   + "decision, not the waveform.", "nontarget"],
   [7000, "The person leaves",
-   "Clear again, so it goes straight back to permitting.", "pulse"],
+   "Clear again, so it goes straight back to permitting.", "leaves"],
   [5200, "A herd, not one animal",
-   "Five together. A startle can cascade into the road, so it refuses."],
+   "Five together. A startle can cascade into the road, so it refuses.", "herd"],
+  [6000, "Traffic in the zone",
+   "Six vehicles on the road with the animal. This is the rule that looks "
+   + "backwards, and it is the most important one: the emitter startles, it "
+   + "does not steer. Startling an animal next to moving traffic can cause "
+   + "the collision the system exists to prevent, so it refuses and warns "
+   + "the traffic instead.", "traffic"],
   [5200, "Already at the carriageway",
-   "Too close. Fleeing from here would mean crossing the road."],
+   "Too close. Fleeing from here would mean crossing the road.", "carriageway"],
   [5000, "Beyond the envelope",
-   "Out of range - the yellow lamp. It will not pretend to act at a distance it cannot reach."],
+   "Out of range - the yellow lamp. It will not pretend to act at a distance "
+   + "it cannot reach.", "far"],
+  [6000, "The enforced quiet period",
+   "It has just emitted, so it will not emit again yet. The full silence is "
+   + "owed before the next burst, whatever the animal does.", "quiet"],
   [9000, "It gives up",
    "Three attempts, then it stops and asks for a human. Acoustic cues are "
-   + "not stock-proof and this does not pretend otherwise."],
-  [4200, "Emergency stop", "Dead until reset, independent of everything above."],
+   + "not stock-proof and this does not pretend otherwise.", "escalate"],
+  [4200, "Emergency stop", "Dead until reset, independent of everything above.",
+   "estop"],
 ];
+
 
 let demoAt = -1, demoTimer = null, pulseTimer = null;
 
@@ -646,7 +678,7 @@ function boardToRest() {
   txt("r");                       // clears the E-stop latch and typed vetoes
   txt("d0");                      // nothing detected, so both lamps go dark
   txt("g1");
-  sent = {d: 0, g: 1, p: false, n: false, e: false};
+  sent = {d: 0, g: 1, v: 0, p: false, n: false, e: false};
 }
 
 function demoStop(msg) {
@@ -666,13 +698,13 @@ function demoStop(msg) {
 function demoBeat(i) {
   if (i >= DEMO.length) {
     boot(false);
-    dist.value = SEEN_MAX; grp.value = 1; person = false; nonTarget = false;
+    dist.value = SEEN_MAX; grp.value = 1; veh.value = 0; person = false; nonTarget = false;
     el("bPerson").classList.remove("held");
     demoStop("That is the whole argument: it detects, and then it declines.");
     return;
   }
   demoAt = i;
-  const [ms, head, say, mode] = DEMO[i];
+  const [ms, head, script, mode] = DEMO[i];  // not 'say': that is the logger
   clearInterval(pulseTimer);
   pulseTimer = null;
 
@@ -688,6 +720,7 @@ function demoBeat(i) {
   el("bPerson").classList.remove("held");
   el("bNon").classList.remove("held");
   S.estop = false;
+  S.doNotEmit = false;
   S.state = "IDLE";
   S.attempts = 0;
   S.incidentStart = 0;
@@ -695,17 +728,44 @@ function demoBeat(i) {
   S.doNotEmit = false;
   el("bStop").classList.remove("latched");
 
-  if (i === 0) { boot(true); dist.value = SEEN_MAX; grp.value = 1; }
-  if (i === 1) { dist.value = 25;  grp.value = 1; }
-  if (i === 2) { dist.value = 25;  person = true; el("bPerson").classList.add("held"); }
-  if (i === 3) { dist.value = 25;  grp.value = 1; }
-  if (i === 4) { dist.value = 25;  grp.value = 5; }
-  if (i === 5) { dist.value = 8;  grp.value = 1; }
-  if (i === 6) { dist.value = 55; grp.value = 1; }
-  if (i === 7) { dist.value = 25;  grp.value = 1; }
-  if (i === 8) { S.estop = true; }
+  /* Keyed on the beat's name, never on its index.
+   * An earlier version matched on i, so inserting a beat in the middle
+   * silently reassigned every later one - the E-stop beat became the quiet
+   * period and nothing announced the swap. A beat now carries its own world. */
+  const W = {
+    clear:       { d: SEEN_MAX, g: 1 },
+    approach:    { d: 25,       g: 1 },
+    person:      { d: 25,       g: 1, person: true },
+    nontarget:   { d: 25,       g: 1, nonTarget: true },
+    leaves:      { d: 25,       g: 1 },
+    herd:        { d: 25,       g: 5 },
+    traffic:     { d: 25,       g: 1, v: 6 },
+    carriageway: { d: 8,        g: 1 },
+    far:         { d: 55,       g: 1 },
+    quiet:       { d: 25,       g: 1, cooldown: true },
+    escalate:    { d: 25,       g: 1 },
+    estop:       { d: 25,       g: 1, estop: true },
+  };
+  const w = W[mode];
+  if (!w) { say("m", "demo: beat " + i + " has no world named " + mode); return; }
 
-  if (mode === "pulse") {
+  if (mode === "clear") boot(true);
+  dist.value = w.d;
+  grp.value  = w.g;
+  veh.value  = w.v || 0;
+  if (w.person)    { person = true;    el("bPerson").classList.add("held"); }
+  if (w.nonTarget) { nonTarget = true; el("bNon").classList.add("held"); }
+  if (w.estop)     S.estop = true;
+  if (w.cooldown)  {
+    /* Land just past an emission, so the quiet period is what refuses here
+     * rather than something the run arrives at by accident. */
+    S.state = "COOLDOWN";
+    S.lastEmissionEnd = now();
+    S.attempts = 1;
+    S.incidentStart = now();
+  }
+
+  if (mode === "approach" || mode === "leaves") {
     /* Re-acquire the target every few seconds so the governor permits again.
      * Green is only ever on for the length of one activation, so the way to
      * show it is more activations, not a longer one. */
@@ -717,7 +777,7 @@ function demoBeat(i) {
   }
 
   el("runStep").textContent = (i + 1) + " of " + DEMO.length + "  -  " + head;
-  el("runSay").textContent = say;
+  el("runSay").textContent = script;
   demoDots();
   demoTimer = setTimeout(() => demoBeat(i + 1), ms);
 }

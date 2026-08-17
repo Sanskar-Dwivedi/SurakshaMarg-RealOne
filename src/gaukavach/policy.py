@@ -34,7 +34,7 @@ from .ledger import Ledger
 from .species import SPECIES, TARGET_KEY, species_for_label
 from .traffic import signal_response_plan
 from .twin import BehaviourTwin, received_level_db
-from .welfare import Governor, SceneContext
+from .welfare import Denial, Governor, SceneContext
 
 
 class State(str, Enum):
@@ -198,8 +198,16 @@ class PolicyEngine:
                     f"{prof.name}"
                     + (" (hears this carrier better than cattle)" if better else "")
                 )
+        # Vehicles were already being classified and then ignored. They are a
+        # veto input: what makes a startle dangerous is not the animal, it is
+        # what the animal might run into.
+        vehicles_in_zone = [
+            t for t in roles["vehicle"]
+            if self.site.classify_position(t.foot_point) != "outside"
+        ]
         scene = SceneContext(
             humans_in_cone=len(humans_in_zone),
+            vehicles_in_zone=len(vehicles_in_zone),
             non_target_animals_in_cone=tuple(nontarget_detail) or nontargets_in_zone,
             sensitive_receptors_nearby=self.cfg.sensitive_receptors_nearby,
         )
@@ -220,7 +228,29 @@ class PolicyEngine:
             track.in_zone = True
             inc = self._incident(track, now, distance_m)
 
-            if inc.state in (State.ESCALATED, State.INHIBITED):
+            if inc.state is State.INHIBITED:
+                # A stop criterion holds this animal. That is a standing
+                # refusal, not the absence of one - so it has to be said every
+                # frame. Skipping silently made the panel and the ledger go
+                # blank, which reads as "nothing here" rather than "refusing".
+                actions.append({
+                    "track_id": track.track_id, "action": "denied",
+                    "reason": ("emission inhibited for this animal by an active "
+                               "stop criterion"),
+                    "denials": [Denial.STOP_CRITERION.value],
+                })
+                continue
+            if inc.state is State.ESCALATED:
+                # Same reasoning as INHIBITED above. Escalated means the system
+                # has given up on acoustics and asked for a human; the engine
+                # state stayed TRACKING and no action was emitted, so the panel
+                # read "tracking, no vetoes" - indistinguishable from a quiet
+                # road while a dispatch is outstanding.
+                self.state = State.ESCALATED
+                actions.append({
+                    "track_id": track.track_id, "action": "escalate",
+                    "reason": inc.escalation_reason,
+                })
                 continue
 
             position = self.site.classify_position(track.foot_point)
@@ -343,7 +373,20 @@ class PolicyEngine:
             })
 
             if not auth.granted:
-                inc.state = State.INHIBITED if scene.humans_in_cone else inc.state
+                # A person in the cone must NOT latch the incident.
+                #
+                # It used to. The first denial with a human present pinned the
+                # incident to INHIBITED, the loop then skipped that animal on
+                # every later frame, and nothing cleared it when the person
+                # walked away - so the scenario reported one veto and then went
+                # silent for ninety-three frames, and the animal could never be
+                # served again even on an empty road.
+                #
+                # Human presence is a live condition. It is re-evaluated every
+                # frame from the scene and refuses on its own merits, exactly
+                # like the non-target rule next to it. The only latching veto
+                # is the panic stop criterion, which is a finding about the
+                # animal rather than a passing fact about the scene.
                 actions.append({
                     "track_id": track.track_id, "action": "denied",
                     "reason": auth.detail,

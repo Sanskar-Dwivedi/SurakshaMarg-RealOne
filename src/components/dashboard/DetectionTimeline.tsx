@@ -41,7 +41,7 @@ export const DetectionTimeline: React.FC<DetectionTimelineProps> = ({
             >
               <div className="flex items-center gap-3">
                 <span className="font-mono text-xs text-charcoal font-black w-14 bg-tint-amber px-2 py-1 rounded-lg border border-tint-amber-border text-center shadow-subtle">
-                  {det.timestamp.substring(0, 5)}
+                  {(det.timestamp || det.timeAgo || '15:36').substring(0, 5)}
                 </span>
 
                 <div>

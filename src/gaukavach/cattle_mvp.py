@@ -72,19 +72,25 @@ class CowTrack:
         return ground_contact_point(self.bbox)
 
 
+
+
 class CowDetector:
     """Cow-only adapter for the supplied custom Ultralytics model."""
 
-    def __init__(self, weights: str | Path, confidence: float = 0.30, iou: float = 0.50) -> None:
+    def __init__(self, weights: str | Path, confidence: float = 0.18, iou: float = 0.45, imgsz: int = 640) -> None:
         self.weights = Path(weights)
         if not self.weights.is_file():
             raise FileNotFoundError(f"cow model not found: {self.weights}")
         try:
+            import os
+            import torch
             from ultralytics import YOLO
+            torch.set_num_threads(max(1, (os.cpu_count() or 4) - 1))
         except ImportError as exc:  # pragma: no cover - environment dependent
             raise RuntimeError("Install the vision extra: pip install -e '.[vision]'") from exc
         self.confidence = confidence
         self.iou = iou
+        self.imgsz = imgsz
         self.model = YOLO(str(self.weights))
 
     def _parse(self, result: Any) -> list[CowDetection]:
@@ -96,7 +102,9 @@ class CowDetector:
             box = result.boxes[index]
             class_id = int(box.cls[0].item())
             class_name = str(names.get(class_id, class_id))
-            if class_name.lower() != "cow":
+            name_lower = class_name.lower()
+            # Allow all cattle/livestock classes and custom single-class models
+            if len(names) > 1 and name_lower not in ["cow", "cattle", "bull", "calf", "bovine", "horse", "donkey", "animal", "0"]:
                 continue
             coords = tuple(int(round(value)) for value in box.xyxy[0].tolist())
             track_id = int(box.id[0].item()) if box.id is not None else None
@@ -104,18 +112,23 @@ class CowDetector:
         return detections
 
     def detect(self, frame: Any) -> list[CowDetection]:
-        results = self.model.predict(source=frame, conf=self.confidence, iou=self.iou, verbose=False)
+        import torch
+        with torch.no_grad():
+            results = self.model.predict(source=frame, conf=self.confidence, iou=self.iou, imgsz=self.imgsz, verbose=False)
         return self._parse(results[0] if results else None)
 
     def track(self, frame: Any) -> list[CowDetection]:
-        results = self.model.track(
-            source=frame,
-            conf=self.confidence,
-            iou=self.iou,
-            persist=True,
-            tracker="bytetrack.yaml",
-            verbose=False,
-        )
+        import torch
+        with torch.no_grad():
+            results = self.model.track(
+                source=frame,
+                conf=self.confidence,
+                iou=self.iou,
+                imgsz=self.imgsz,
+                persist=True,
+                tracker="bytetrack.yaml",
+                verbose=False,
+            )
         return self._parse(results[0] if results else None)
 
 

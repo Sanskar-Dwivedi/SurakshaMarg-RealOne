@@ -90,6 +90,14 @@ def cmd_cattle(args) -> int:
     return 0
 
 
+def cmd_server(args) -> int:
+    from .server import main as server_main  # noqa: PLC0415
+
+    server_main()
+    return 0
+
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -764,6 +772,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--max-frames", type=int, default=0)
     s.add_argument("--show", action="store_true")
     s.set_defaults(func=cmd_cattle)
+
+    s = sub.add_parser("server", help="start real-time WebSocket and MJPEG API server")
+    s.set_defaults(func=cmd_server)
+
 
     s = sub.add_parser("demo", help="the whole sequence, in presentation order")
     s.add_argument("--full", action="store_true")

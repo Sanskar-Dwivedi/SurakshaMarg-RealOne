@@ -130,3 +130,35 @@ def test_wiring_check_uses_the_same_pins_as_the_governor():
         assert a.group(1) == b.group(1), (
             f"{n} is GPIO{a.group(1)} in the governor but GPIO{b.group(1)} "
             f"in the wiring check")
+
+
+def test_now_is_restamped_after_the_watchdog_stops_emission():
+    """
+    Guard against a bug the Python twin structurally cannot catch.
+
+    `now` is read once at the top of the governor pass. emitStop() then fades
+    the carrier over RAMP_MS using delay(1) per step, so it writes
+    lastEmissionEnd about 26 ms AFTER `now`. The quiet-period guard computes
+    (now - lastEmissionEnd) in uint32_t, which underflows to ~4.29e9 - not
+    less than MIN_SILENCE_MS - so the guard was skipped and the same pass
+    re-permitted immediately.
+
+    Measured on the board before the fix: three 3 s bursts back to back with
+    no silence at all, on a limit that exists for animal welfare. Python
+    integers do not underflow, so no amount of twin testing finds this.
+    """
+    src = (ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino").read_text(encoding="utf-8")
+    start = src.index("WATCHDOG max activation")
+    block = src[start:start + 900]
+    end = block.index("if (!seen)") if "if (!seen)" in block else len(block)
+    assert "now = millis();" in block[:end], (
+        "the watchdog stops emission but does not re-stamp `now`; the "
+        "quiet-period comparison will underflow and never fire"
+    )
+
+
+def test_the_quiet_period_guard_still_compares_against_last_emission_end():
+    """If this moves, re-check the underflow above rather than trusting it."""
+    src = (ROOT / "hardware" / "wokwi_esp32" / "gaukavach_esp32.ino").read_text(encoding="utf-8")
+    assert "now - lastEmissionEnd" in src
+    assert "enforced quiet period" in src

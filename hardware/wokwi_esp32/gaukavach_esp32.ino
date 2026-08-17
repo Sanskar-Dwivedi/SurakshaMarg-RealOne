@@ -700,6 +700,20 @@ void loop() {
   if (state == EMITTING && (now - emitStartedAt) >= scaled(MAX_ACTIVATION_MS)) {
     emitStop("WATCHDOG max activation");
     state = COOLDOWN;
+    /* Re-stamp `now`, or the quiet period never fires.
+     *
+     * `now` was read at the top of this pass. emitStop() then fades the
+     * carrier over RAMP_MS with delay(1) per step, so by the time it writes
+     * lastEmissionEnd the clock has moved ~26 ms PAST `now`. The quiet-period
+     * guard below computes (now - lastEmissionEnd) in uint32_t, so that
+     * subtraction underflows to about 4.29e9 - which is not < MIN_SILENCE_MS,
+     * so the guard is skipped and the very next block re-permits inside the
+     * same pass. Measured on the bench: three 3 s bursts back to back with no
+     * silence between them at all, on a limit that exists for welfare.
+     *
+     * The Python twin cannot catch this, because Python integers do not
+     * underflow. Only the board can. */
+    now = millis();
   }
 
   if (!seen) {

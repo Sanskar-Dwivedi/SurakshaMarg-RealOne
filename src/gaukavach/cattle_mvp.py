@@ -153,7 +153,7 @@ class CowTrackManager:
 class Speaker:
     speaker_id: str
     position: Point
-    coverage_polygon: tuple[Point, ...]
+    coverage_polygon: tuple[Point, ...] = ()
     enabled: bool = True
 
     @classmethod
@@ -182,11 +182,13 @@ def select_speaker(
     current_speaker_id: str | None = None,
     switch_margin: float = 0.5,
 ) -> SpeakerChoice:
-    candidates = [
-        speaker for speaker in speakers
-        if speaker.enabled and len(speaker.coverage_polygon) >= 3
-        and point_in_polygon(cow_position, speaker.coverage_polygon)
-    ]
+    """Return the nearest enabled speaker in fixed-camera pixel coordinates.
+
+    The operator supplies speaker locations during installation. Coverage circles
+    are intentionally not inferred: a fixed radius in pixels is not a reliable
+    physical speaker range in a perspective CCTV image.
+    """
+    candidates = [speaker for speaker in speakers if speaker.enabled]
     if not candidates:
         return SpeakerChoice(None, None, NO_VALID_SPEAKER)
     distances = {
@@ -204,29 +206,61 @@ def select_speaker(
 class SceneConfig:
     road_polygon: tuple[Point, ...]
     speakers: tuple[Speaker, ...]
+    camera_id: str | None = None
+    frame_size: tuple[int, int] | None = None
 
     @classmethod
     def load(cls, path: str | Path) -> "SceneConfig":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         road = tuple((float(x), float(y)) for x, y in data.get("road_polygon", []))
-        return cls(road, tuple(Speaker.from_dict(item) for item in data.get("speakers", [])))
+        raw_size = data.get("frame_size")
+        frame_size = None if raw_size is None else (int(raw_size["width"]), int(raw_size["height"]))
+        return cls(road, tuple(Speaker.from_dict(item) for item in data.get("speakers", [])), data.get("camera_id"), frame_size)
+
+    def save(self, path: str | Path) -> None:
+        output = Path(path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": 2,
+            "camera_id": self.camera_id,
+            "frame_size": None if self.frame_size is None else {"width": self.frame_size[0], "height": self.frame_size[1]},
+            "road_polygon": [[x, y] for x, y in self.road_polygon],
+            "speakers": [
+                {"speaker_id": speaker.speaker_id, "position_px": list(speaker.position), "enabled": speaker.enabled}
+                for speaker in self.speakers
+            ],
+        }
+        temporary = output.with_suffix(f"{output.suffix}.tmp")
+        temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        temporary.replace(output)
+
+    def validate_for_frame(self, camera_id: str, width: int, height: int) -> None:
+        if self.camera_id is not None and self.camera_id != camera_id:
+            raise RuntimeError("scene configuration belongs to a different camera ID; configure this camera again")
+        if self.frame_size is not None and self.frame_size != (width, height):
+            raise RuntimeError(
+                f"video resolution changed from {self.frame_size[0]}x{self.frame_size[1]} to {width}x{height}; configure this camera again"
+            )
 
 
-def draw_frame(frame: Any, tracks: Iterable[CowTrack], scene: SceneConfig, selected_ids: set[str] | None = None) -> Any:
+def draw_frame(
+    frame: Any,
+    tracks: Iterable[CowTrack],
+    scene: SceneConfig,
+    selected_ids: set[str] | None = None,
+    nearest_speakers: dict[int, SpeakerChoice] | None = None,
+) -> Any:
     import cv2
     import numpy as np
 
     selected_ids = selected_ids or set()
+    nearest_speakers = nearest_speakers or {}
     output = frame.copy()
     if len(scene.road_polygon) >= 3:
         road = np.array([(int(x), int(y)) for x, y in scene.road_polygon], dtype=np.int32)
         cv2.polylines(output, [road], True, (255, 180, 0), 2)
     for speaker in scene.speakers:
-        if len(speaker.coverage_polygon) < 3:
-            continue
-        polygon = np.array([(int(x), int(y)) for x, y in speaker.coverage_polygon], dtype=np.int32)
         color = (0, 255, 0) if speaker.speaker_id in selected_ids else (180, 80, 255)
-        cv2.polylines(output, [polygon], True, color, 3 if speaker.speaker_id in selected_ids else 2)
         point = (int(speaker.position[0]), int(speaker.position[1]))
         cv2.circle(output, point, 7, color, -1)
         cv2.putText(output, speaker.speaker_id, (point[0] + 8, point[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
@@ -238,23 +272,33 @@ def draw_frame(frame: Any, tracks: Iterable[CowTrack], scene: SceneConfig, selec
         ground = (int(track.ground_point[0]), int(track.ground_point[1]))
         cv2.circle(output, ground, 5, (255, 0, 255), -1)
         state = "UNCONFIRMED_COW"
-        speaker_id = None
+        choice = nearest_speakers.get(track.track_id)
         if track.confirmed:
             state = "ON_ROAD" if on_road else "OFF_ROAD"
         label = f"ID:{track.track_id} {track.confidence:.2f} {state}"
-        if speaker_id:
-            label += f" {speaker_id}"
+        if choice and choice.speaker_id:
+            label += f" | Nearest: {choice.speaker_id} ({choice.distance:.0f}px)"
         cv2.putText(output, label, (x1, max(18, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 1, cv2.LINE_AA)
     return output
 
 
-def _configure_scene(image_path: str, output_path: str, coverage_px: float = 180.0) -> None:
+def _configure_scene(source_path: str, output_path: str, camera_id: str = "default-camera") -> None:
     import cv2
     import numpy as np
 
-    image = cv2.imread(image_path)
+    source = Path(source_path)
+    if not source.is_file():
+        raise RuntimeError(f"selected image/video not found: {source_path}")
+    if source.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}:
+        image = cv2.imread(str(source))
+    else:
+        capture = cv2.VideoCapture(str(source))
+        ok, image = capture.read()
+        capture.release()
+        if not ok:
+            image = None
     if image is None:
-        raise RuntimeError(f"could not read image: {image_path}")
+        raise RuntimeError(f"could not read the first frame from: {source_path}")
     window = "cattle scene configuration"
 
     def collect(title: str, minimum: int, points: list[list[int]]) -> list[list[int]]:
@@ -265,7 +309,7 @@ def _configure_scene(image_path: str, output_path: str, coverage_px: float = 180
             for index, point in enumerate(points, 1):
                 cv2.circle(canvas, tuple(point), 7, (0, 255, 0), -1)
                 cv2.putText(canvas, f"{index}", (point[0] + 8, point[1] - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.putText(canvas, f"{title} | left-click | right-click undo | ENTER finish", (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+            cv2.putText(canvas, f"{title} | left-click add | right-click undo | C clear | ENTER finish", (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
 
         def callback(event: int, x: int, y: int, _flags: int, _param: object) -> None:
             if event == cv2.EVENT_LBUTTONDOWN:
@@ -283,30 +327,49 @@ def _configure_scene(image_path: str, output_path: str, coverage_px: float = 180
             key = cv2.waitKey(20) & 0xFF
             if key in (10, 13) and len(points) >= minimum:
                 return points
+            if key in (ord("c"), ord("C")):
+                points.clear()
+                redraw()
             if key == 27:
                 raise RuntimeError("scene configuration cancelled")
 
-    road = collect("Road polygon", 3, [])
-    locations = collect("Click each speaker location, then ENTER", 1, [])
-    speakers = []
-    for index, (x, y) in enumerate(locations, 1):
-        circle = [
-            [round(x + coverage_px * float(np.cos(angle)), 2), round(y + coverage_px * float(np.sin(angle)), 2)]
-            for angle in np.linspace(0, 2 * np.pi, 48, endpoint=False)
-        ]
-        speakers.append({"speaker_id": f"S{index}", "position_px": [x, y], "coverage_polygon": circle, "enabled": True})
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps({"road_polygon": road, "speakers": speakers}, indent=2), encoding="utf-8")
-    cv2.destroyAllWindows()
-    print(f"Saved scene configuration to {output.resolve()}")
+    try:
+        while True:
+            road = collect("Road polygon", 3, [])
+            locations = collect("Speaker locations", 1, [])
+            preview = image.copy()
+            cv2.polylines(preview, [np.array(road, dtype="int32")], True, (255, 180, 0), 2)
+            for index, (x, y) in enumerate(locations, 1):
+                cv2.circle(preview, (x, y), 8, (0, 255, 0), -1)
+                cv2.putText(preview, f"S{index}", (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+            cv2.putText(preview, "Review | S save | R redraw | ESC cancel", (15, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
+            while True:
+                cv2.imshow(window, preview)
+                key = cv2.waitKey(20) & 0xFF
+                if key in (ord("s"), ord("S")):
+                    height, width = image.shape[:2]
+                    SceneConfig(
+                        tuple((float(x), float(y)) for x, y in road),
+                        tuple(Speaker(f"S{index}", (float(x), float(y))) for index, (x, y) in enumerate(locations, 1)),
+                        camera_id,
+                        (width, height),
+                    ).save(output_path)
+                    print(f"Saved scene configuration to {Path(output_path).resolve()}")
+                    return
+                if key in (ord("r"), ord("R")):
+                    break
+                if key == 27:
+                    raise RuntimeError("scene configuration cancelled")
+    finally:
+        cv2.destroyAllWindows()
 
 
-def configure_scene(image_path: str, output_path: str, coverage_px: float = 180.0) -> None:
-    _configure_scene(image_path, output_path, coverage_px)
+def configure_scene(source_path: str, output_path: str, camera_id: str = "default-camera") -> None:
+    """Configure a fixed camera using an image or the first frame of a video."""
+    _configure_scene(source_path, output_path, camera_id)
 
 
-def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str | None = None, confidence: float = 0.30, confirmation_frames: int = 3, max_frames: int = 0, show: bool = False) -> dict[str, Any]:
+def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str | None = None, confidence: float = 0.30, confirmation_frames: int = 3, max_frames: int = 0, show: bool = False, camera_id: str = "default-camera", event_log_path: str | None = None) -> dict[str, Any]:
     """Run the cow-only MVP on an image or video. No hardware is activated."""
 
     import cv2
@@ -330,7 +393,8 @@ def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str
     total_detections = 0
     confirmed = 0
     selected_counts: dict[str, int] = {}
-    current_speakers: dict[int, str | None] = {}
+    event_log = Path(event_log_path) if event_log_path else None
+    events: list[dict[str, Any]] = []
     last_output = None
     while True:
         if image_mode:
@@ -339,22 +403,31 @@ def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str
             ok, frame = capture.read()
         if not ok:
             break
+        if frame_index == 0:
+            scene.validate_for_frame(camera_id, frame.shape[1], frame.shape[0])
         detections = detector.track(frame)
         total_detections += len(detections)
         tracks = manager.update(detections, frame_index)
         selected_ids: set[str] = set()
+        nearest_speakers: dict[int, SpeakerChoice] = {}
         for track in tracks:
-            if not track.confirmed:
-                continue
-            confirmed += 1
-            if not point_in_polygon(track.ground_point, scene.road_polygon):
-                continue
-            choice = select_speaker(track.ground_point, scene.speakers, current_speakers.get(track.track_id))
-            current_speakers[track.track_id] = choice.speaker_id
-            if choice.speaker_id:
+            choice = select_speaker(track.ground_point, scene.speakers)
+            nearest_speakers[track.track_id] = choice
+            on_road = point_in_polygon(track.ground_point, scene.road_polygon)
+            events.append({
+                "frame_index": frame_index,
+                "track_id": track.track_id,
+                "on_road": on_road,
+                "speaker_id": choice.speaker_id,
+                "distance_px": choice.distance,
+                "state": choice.state,
+            })
+            if track.confirmed:
+                confirmed += 1
+            if track.confirmed and on_road and choice.speaker_id:
                 selected_ids.add(choice.speaker_id)
                 selected_counts[choice.speaker_id] = selected_counts.get(choice.speaker_id, 0) + 1
-        rendered = draw_frame(frame, tracks, scene, selected_ids)
+        rendered = draw_frame(frame, tracks, scene, selected_ids, nearest_speakers)
         last_output = rendered
         if image_mode:
             destination = Path(output_path) if output_path else source.with_name(f"{source.stem}_cattle.jpg")
@@ -379,6 +452,9 @@ def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str
         writer.release()
     if show:
         cv2.destroyAllWindows()
+    if event_log is not None:
+        event_log.parent.mkdir(parents=True, exist_ok=True)
+        event_log.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
     return {
         "frames": frame_index,
         "detections": total_detections,
@@ -387,4 +463,5 @@ def run_cattle(source_path: str, weights: str, scene_path: str, output_path: str
         "output": output_path,
         "hardware_activated": False,
         "last_frame_available": last_output is not None,
+        "event_log": str(event_log) if event_log else None,
     }

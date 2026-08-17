@@ -7,6 +7,7 @@ build/
 .venv/
 venv/
 *.pt
+!models/cow_best.pt
 data/logs/*.jsonl
 dashboard/data.json
 dashboard/trim.json

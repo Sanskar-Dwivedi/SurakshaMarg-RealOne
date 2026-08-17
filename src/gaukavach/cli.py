@@ -18,6 +18,7 @@ Commands are grouped by what a sceptical reviewer would want to check:
     render      render a scenario to MP4, or overlay real video
     demo        the full sequence, in the order to present it
     video       run perception on a real video file, if one is supplied
+    cattle      run the cow-only road/speaker MVP (no hardware)
 """
 
 from __future__ import annotations
@@ -56,6 +57,37 @@ RULE = "=" * 74
 
 def _atm(args) -> Atmosphere:
     return Atmosphere(temp_c=args.temp, rh_pct=args.rh, ambient_spl_db=args.ambient)
+
+
+def _default_cow_weights() -> str:
+    repo_model = Path(__file__).resolve().parents[2] / "models" / "cow_best.pt"
+    if repo_model.is_file():
+        return str(repo_model)
+    return "models/cow_best.pt"
+
+
+def cmd_cattle_configure(args) -> int:
+    from .cattle_mvp import configure_scene  # noqa: PLC0415
+
+    configure_scene(args.image, args.output, args.coverage_px)
+    return 0
+
+
+def cmd_cattle(args) -> int:
+    from .cattle_mvp import run_cattle  # noqa: PLC0415
+
+    result = run_cattle(
+        source_path=args.source,
+        weights=args.weights,
+        scene_path=args.scene,
+        output_path=args.output,
+        confidence=args.conf,
+        confirmation_frames=args.confirm_frames,
+        max_frames=args.max_frames,
+        show=args.show,
+    )
+    print(json.dumps(result, indent=2))
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -737,6 +769,23 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--max-frames", type=int, default=0)
     s.add_argument("--ledger", default=None)
     s.set_defaults(func=cmd_video)
+
+    s = sub.add_parser("cattle-configure", help="configure a cow-road polygon and speaker zones")
+    s.add_argument("--image", required=True, help="reference CCTV image")
+    s.add_argument("--output", default="cattle_scene.json")
+    s.add_argument("--coverage-px", type=float, default=180.0)
+    s.set_defaults(func=cmd_cattle_configure)
+
+    s = sub.add_parser("cattle", help="run the cow road/speaker MVP; never activates hardware")
+    s.add_argument("source", help="image or video path")
+    s.add_argument("--weights", default=_default_cow_weights(), help="cow detector weights (default: models/cow_best.pt)")
+    s.add_argument("--scene", required=True, help="scene configuration from cattle-configure")
+    s.add_argument("--output", default=None, help="annotated image or video output")
+    s.add_argument("--conf", type=float, default=0.30)
+    s.add_argument("--confirm-frames", type=int, default=3)
+    s.add_argument("--max-frames", type=int, default=0)
+    s.add_argument("--show", action="store_true")
+    s.set_defaults(func=cmd_cattle)
 
     s = sub.add_parser("demo", help="the whole sequence, in presentation order")
     s.add_argument("--full", action="store_true")

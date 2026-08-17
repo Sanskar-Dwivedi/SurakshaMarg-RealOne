@@ -109,6 +109,13 @@ python -m gaukavach run person-in-cone --verbose
 python -m gaukavach video clip.mp4    # real YOLO perception, if you have footage
 ```
 
+## Cattle-road MVP
+
+The repository also contains an additive cow-only road/speaker selection MVP.
+It uses a local cow detector, ByteTrack identity, bottom-centre ground points,
+a manually configured road polygon, and configured speaker coverage. It never
+activates physical hardware. See [docs/CATTLE_MVP.md](docs/CATTLE_MVP.md).
+
 ---
 
 ## Architecture

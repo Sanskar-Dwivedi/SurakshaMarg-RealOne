@@ -542,22 +542,42 @@ def cmd_sim(args) -> int:
     print(f"  field cells  {cells}   {verdicts}")
     print(f"  written      {args.out}")
 
+    # The built page is a few megabytes of data wrapped around 45 KB of code,
+    # so only the code is tracked. The page is assembled here from the
+    # template plus whichever data files exist, which is what makes the
+    # console reproducible from a clean checkout instead of being a binary
+    # that has to be carried around by hand.
     page = Path(args.page)
-    if page.exists():
-        html = page.read_text(encoding="utf-8")
-        marker = '<script id="sim" type="application/json">'
-        end = "</script>"
+    tmpl = Path(args.template)
+    if not page.exists():
+        if not tmpl.exists():
+            print(f"  note: neither {page} nor {tmpl} found, wrote JSON only")
+            return 0
+        page.write_text(tmpl.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"  page         built from {tmpl}")
+
+    html = page.read_text(encoding="utf-8")
+    end = "</script>"
+    for pid, src_path in (("sim", args.out),
+                          ("foot", "dashboard/footage.json"),
+                          ("outc", "dashboard/outcome.json")):
+        data_file = Path(src_path)
+        marker = f'<script id="{pid}" type="application/json">'
         i = html.find(marker)
-        if i >= 0:
-            j = html.find(end, i)
-            payload = Path(args.out).read_text(encoding="utf-8")
-            html = html[: i + len(marker)] + payload + html[j:]
-            page.write_text(html, encoding="utf-8")
-            print(f"  injected     {page}  ({page.stat().st_size / 1048576:.2f} MB)")
-        else:
-            print(f"  WARNING: no payload marker in {page}; left unchanged")
-    else:
-        print(f"  note: {page} not found, wrote JSON only")
+        if i < 0:
+            print(f"  WARNING: no '{pid}' payload marker in {page}")
+            continue
+        j = html.find(end, i)
+        current = html[i + len(marker): j]
+        if not data_file.exists():
+            # Never blank a payload that is already in the page just because
+            # its source file is missing - that silently guts a working demo.
+            if not current.strip():
+                print(f"  note: {pid:5} has no data ({data_file} missing)")
+            continue
+        html = html[: i + len(marker)] + data_file.read_text(encoding="utf-8") + html[j:]
+    page.write_text(html, encoding="utf-8")
+    print(f"  injected     {page}  ({page.stat().st_size / 1048576:.2f} MB)")
     print()
     print("Open the page in any browser. It is fully self-contained.")
     return 0
@@ -690,6 +710,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("sim", help="rebuild the interactive browser simulator")
     s.add_argument("--out", default="dashboard/sim.json")
     s.add_argument("--page", default="dashboard/simulator.html")
+    s.add_argument("--template", default="dashboard/simulator_template.html",
+                   help="code-only page used when --page does not exist yet")
     s.add_argument("--step", type=int, default=16, help="decision-field grid, px")
     s.set_defaults(func=cmd_sim)
 

@@ -59,6 +59,13 @@ def _atm(args) -> Atmosphere:
     return Atmosphere(temp_c=args.temp, rh_pct=args.rh, ambient_spl_db=args.ambient)
 
 
+def _default_cow_weights() -> str:
+    repo_model = Path(__file__).resolve().parents[2] / "models" / "cow_best.pt"
+    if repo_model.is_file():
+        return str(repo_model)
+    return "models/cow_best.pt"
+
+
 def cmd_cattle_configure(args) -> int:
     from .cattle_mvp import configure_scene  # noqa: PLC0415
 
@@ -749,7 +756,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("cattle", help="run the cow road/speaker MVP; never activates hardware")
     s.add_argument("source", help="image or video path")
-    s.add_argument("--weights", required=True, help="cow detector weights, kept outside Git")
+    s.add_argument("--weights", default=_default_cow_weights(), help="cow detector weights (default: models/cow_best.pt)")
     s.add_argument("--scene", required=True, help="scene configuration from cattle-configure")
     s.add_argument("--output", default=None, help="annotated image or video output")
     s.add_argument("--conf", type=float, default=0.30)

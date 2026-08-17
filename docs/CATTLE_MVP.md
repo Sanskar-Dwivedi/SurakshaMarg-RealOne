@@ -1,86 +1,105 @@
-# Cattle-road MVP
+# Cattle-Road Perception MVP
 
-The cattle MVP is an additive, dry-run perception workflow. It does not
-replace GauKavach's evidence-graded policy engine, acoustic governor, emitter,
-hardware, dashboard, or scenario pipeline.
+The cattle MVP is an additive, dry-run perception workflow that detects cows, tracks them across frames, determines road-space presence via a road polygon, and selects the nearest covering speaker unit.
+
+> [!IMPORTANT]
+> The cattle MVP is purely a software/perception demonstration. It **never activates physical hardware** or acoustic emitters.
 
 ```text
-camera/image
-    ↓
-custom YOLO cow detector
-    ↓
-ByteTrack identity
-    ↓
+camera / image / video
+          │
+ custom YOLO cow detector
+  (models/cow_best.pt)
+          │
+  ByteTrack identity
+          │
 multi-frame confirmation
-    ↓
-bottom-centre ground-contact point
-    ↓
-manual road polygon
-    ↓
-ON_ROAD / OFF_ROAD
-    ↓
-speaker coverage filtering
-    ↓
-nearest valid speaker
+          │
+bottom-centre ground point
+          │
+   road polygon check
+          │
+   ON_ROAD / OFF_ROAD
+          │
+speaker coverage filter
+          │
+ nearest valid speaker
 ```
 
-## Setup
+## Setup & Dependencies
 
-Install the optional vision dependencies:
+Install optional vision dependencies in your environment:
 
-```powershell
+```bash
 pip install -e ".[vision]"
 ```
 
-Keep the custom cow weights outside Git. The existing local model is:
+## Bundled Model
+
+The repository bundles a trained cow detection model:
 
 ```text
-C:\Users\ashay\runs\detect\train-3\weights\best.pt
+models/cow_best.pt
 ```
 
-Create a scene configuration from a reference image. The first window is for
-the road polygon; the second is for speaker locations. Speaker IDs are
-assigned as `S1`, `S2`, and so on. Coverage circles are image-space MVP zones;
-metric seven-metre coverage requires a measured camera calibration.
+This model file (~5.2 MB) is tracked directly in Git. The `gaukavach cattle` command uses `models/cow_best.pt` automatically by default without requiring a `--weights` argument.
 
-```powershell
-python -m gaukavach cattle-configure `
-  --image legendarycowtester.png `
-  --coverage-px 500 `
-  --output cattle_scene.json
+### Overriding the Model
+
+To run inference with a custom model instead of the bundled default:
+
+```bash
+python -m gaukavach cattle input.png --scene calibration/legendary_scene.json --weights path/to/custom_model.pt
 ```
 
-Run an image:
+## Running Image Inference
 
-```powershell
-python -m gaukavach cattle legendarycowtester.png `
-  --weights "C:\Users\ashay\runs\detect\train-3\weights\best.pt" `
-  --scene cattle_scene.json `
-  --confirm-frames 1 `
-  --output legendary_cattle_result.jpg
+Run cattle perception on an image using the bundled default model:
+
+```bash
+python -m gaukavach cattle test_image.png   --scene calibration/legendary_scene.json   --output annotated_result.jpg   --conf 0.25   --confirm-frames 1
 ```
 
-Run a video:
+The annotated output image will show bounding boxes, ground-contact points, track IDs, `ON_ROAD`/`OFF_ROAD` status, and speaker coverage highlights.
 
-```powershell
-python -m gaukavach cattle cow4.mp4 `
-  --weights "C:\Users\ashay\runs\detect\train-3\weights\best.pt" `
-  --scene cattle_scene.json `
-  --output cow4_cattle_result.mp4
+## Running Video Inference
+
+Run cattle perception on a video stream or file:
+
+```bash
+python -m gaukavach cattle test_video.mp4   --scene calibration/legendary_scene.json   --output annotated_result.mp4   --conf 0.25   --confirm-frames 3
 ```
 
-The annotated output contains the cow box, track ID, confidence,
-ground-contact point, road polygon, speaker zones, and selected speaker. No
-physical speaker is activated.
+## Scene Calibration & Configuration
 
-## Safety boundary
+### Creating a New Scene Calibration
 
-This command is the cow-road/speaker-selection MVP. It does not automatically
-invoke the existing acoustic policy engine. The existing GauKavach command
-path remains available and continues to enforce its welfare, non-target,
-flight-path, exposure, dry-run, and escalation rules.
+Camera perspective and road geometry vary by installation. To configure a new scene from a reference CCTV frame:
 
-The MVP currently requires manual scene setup. Camera movement invalidates the
-scene configuration. A custom cow-only model does not provide the
-person/dog/horse/sheep/vehicle veto coverage of the existing COCO perception
-path, so it must not be treated as a replacement for that safety pipeline.
+```bash
+python -m gaukavach cattle-configure   --image reference_frame.png   --coverage-px 180   --output scene_config.json
+```
+
+An interactive GUI window will open:
+1. **Road Polygon**: Left-click points outlining the roadway boundary (minimum 3 points). Press `ENTER` when complete. Right-click undoes the last point.
+2. **Speaker Locations**: Left-click each speaker mount location. Press `ENTER` when complete.
+
+> [!NOTE]
+> The included `calibration/legendary_scene.json` is specific to the reference test camera perspective and scene geometry. New camera placements require creating a scene calibration specific to that angle.
+
+### Road Polygon Meaning
+
+The road polygon defines the active vehicle lane boundary in 2D image coordinates. For each detected cow, its ground-contact point (bottom-centre of the bounding box) is evaluated against the road polygon:
+- Ground point **inside** polygon: Marked `ON_ROAD` (triggers speaker selection).
+- Ground point **outside** polygon: Marked `OFF_ROAD` (monitored but inactive).
+
+### Speaker Coverage Configuration
+
+Each speaker (`S1`, `S2`, etc.) has a defined position and coverage radius (polygon). When a confirmed cow is `ON_ROAD`:
+1. System filters speakers whose coverage polygon contains the cow's ground point.
+2. The nearest valid, enabled speaker is selected for targeted activation logic.
+
+## Safety & Integration Boundary
+
+- **No Hardware Activation**: This MVP runs in dry-run/simulation mode only.
+- **Safety Pipeline Coexistence**: The cattle MVP remains additive and does not modify GauKavach's core welfare, non-target species veto (dogs, goats, horses), or acoustic governor pipelines.

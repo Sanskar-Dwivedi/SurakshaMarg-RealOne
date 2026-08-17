@@ -69,7 +69,7 @@ def _default_cow_weights() -> str:
 def cmd_cattle_configure(args) -> int:
     from .cattle_mvp import configure_scene  # noqa: PLC0415
 
-    configure_scene(args.image, args.output, args.coverage_px)
+    configure_scene(args.source, args.output, args.camera_id)
     return 0
 
 
@@ -85,6 +85,8 @@ def cmd_cattle(args) -> int:
         confirmation_frames=args.confirm_frames,
         max_frames=args.max_frames,
         show=args.show,
+        camera_id=args.camera_id,
+        event_log_path=args.event_log,
     )
     print(json.dumps(result, indent=2))
     return 0
@@ -770,20 +772,22 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--ledger", default=None)
     s.set_defaults(func=cmd_video)
 
-    s = sub.add_parser("cattle-configure", help="configure a cow-road polygon and speaker zones")
-    s.add_argument("--image", required=True, help="reference CCTV image")
-    s.add_argument("--output", default="cattle_scene.json")
-    s.add_argument("--coverage-px", type=float, default=180.0)
+    s = sub.add_parser("cattle-configure", help="configure a road polygon and speaker locations from a video first frame")
+    s.add_argument("--source", required=True, help="reference image or video; a video's first frame is used")
+    s.add_argument("--output", default="calibration/scene_config.json")
+    s.add_argument("--camera-id", default="default-camera", help="stable ID reused for videos from this fixed camera")
     s.set_defaults(func=cmd_cattle_configure)
 
-    s = sub.add_parser("cattle", help="run the cow road/speaker MVP; never activates hardware")
+    s = sub.add_parser("cattle", help="run fixed-polygon cow detection and nearest-speaker selection; never activates hardware")
     s.add_argument("source", help="image or video path")
     s.add_argument("--weights", default=_default_cow_weights(), help="cow detector weights (default: models/cow_best.pt)")
-    s.add_argument("--scene", required=True, help="scene configuration from cattle-configure")
+    s.add_argument("--scene", default="calibration/scene_config.json", help="persistent scene configuration from cattle-configure")
+    s.add_argument("--camera-id", default="default-camera", help="must match the ID used during cattle-configure")
     s.add_argument("--output", default=None, help="annotated image or video output")
     s.add_argument("--conf", type=float, default=0.30)
     s.add_argument("--confirm-frames", type=int, default=3)
     s.add_argument("--max-frames", type=int, default=0)
+    s.add_argument("--event-log", default=None, help="optional JSONL nearest-speaker event log")
     s.add_argument("--show", action="store_true")
     s.set_defaults(func=cmd_cattle)
 

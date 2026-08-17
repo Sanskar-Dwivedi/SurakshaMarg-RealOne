@@ -80,3 +80,59 @@ def test_vehicles_are_not_labelled_as_non_target_species():
     assert m, "actor chip logic not found"
     assert "vehicle" in m.group(0), (
         "vehicles still fall through to the non-target chip")
+
+
+# ---------------------------------------------------------------------------
+# A refusal that stops being reported is worse than no refusal at all: the
+# panel and the ledger both fall back to looking like an empty road.
+# ---------------------------------------------------------------------------
+
+
+def _record_all():
+    import sys
+    sys.path.insert(0, str(ROOT / "src"))
+    from gaukavach.acoustics import Atmosphere
+    from gaukavach.detect import DEMO_SITE
+    from gaukavach.scenario import SCENARIOS
+    from gaukavach.simulate import record_scenario
+    atm = Atmosphere()
+    return {n: record_scenario(s, DEMO_SITE, atm) for n, s in SCENARIOS.items()}
+
+
+def test_no_scenario_goes_silent_once_it_has_started_deciding():
+    """
+    The bug this catches: a person in the cone latched the incident to
+    INHIBITED, the per-track loop then skipped that animal silently on every
+    later frame, and nothing cleared the latch when the person walked away.
+    person-in-cone reported one veto and then nothing for 93 frames, so the
+    console showed IDLE / "None active" through the whole encounter - the
+    scenario whose entire job is to show the human veto.
+
+    Escalation had the same shape: the engine stayed TRACKING and emitted no
+    action, so an outstanding human dispatch looked like a quiet road.
+    """
+    for name, rec in _record_all().items():
+        frames = rec["frames"]
+        started = next((i for i, f in enumerate(frames) if f["x"]), None)
+        assert started is not None, f"{name}: never took any action at all"
+        after = frames[started:]
+        silent = sum(1 for f in after if not f["x"])
+        assert silent <= len(after) * 0.15, (
+            f"{name}: {silent}/{len(after)} frames report no action after the "
+            f"first decision - a standing refusal has stopped being reported")
+
+
+def test_the_human_veto_is_live_not_latched():
+    """A person is a passing fact about the scene, so the refusal must track
+    their presence rather than pinning the animal permanently."""
+    import sys
+    sys.path.insert(0, str(ROOT / "src"))
+    from gaukavach.welfare import Denial
+
+    rec = _record_all()["person-in-cone"]
+    human = Denial.HUMAN_PRESENT.value
+    hits = sum(1 for f in rec["frames"] for x in f["x"]
+               if human in x.get("den", []))
+    assert hits > 20, (
+        f"the human veto is reported on only {hits} frames - it is latching "
+        f"and then falling silent instead of refusing every frame")

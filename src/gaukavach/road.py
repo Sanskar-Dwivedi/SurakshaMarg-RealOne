@@ -41,7 +41,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
-from .detect import Site, Track, point_in_polygon
+from .detect import VEHICLE_ROLES, Site, Track, point_in_polygon
 
 # Geometric events this module is willing to assert. Deliberately narrow: each
 # one is a statement about pixels and seconds, not about the law.
@@ -49,7 +49,10 @@ WRONG_WAY = "vehicle-against-flow"
 STOPPED_IN_LANE = "vehicle-stopped-in-lane"
 PERSON_IN_LANE = "person-on-carriageway"
 
-VEHICLE_LABELS = frozenset({"car", "motorcycle", "bus", "truck", "bicycle"})
+# Imported rather than restated: when a non-COCO detector adds a class the
+# governor knows about - autorickshaw, tractor, cart - the violation watch
+# must see it too, or it silently stops watching most of an Indian road.
+VEHICLE_LABELS = VEHICLE_ROLES
 
 # Crowding bands, in people per 100 m2 of carriageway.
 #

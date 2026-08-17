@@ -306,3 +306,24 @@ def test_direction_and_speed_agree_about_which_interval_they_describe():
     pts = w._window(t)
     assert len(pts) == 4, "the window is not the size it claims"
     assert pts == reversed_recently[-4:]
+
+
+# -- non-COCO detectors ------------------------------------------------------
+
+def test_the_violation_watch_sees_vehicles_coco_cannot_name():
+    """
+    An autorickshaw is a vehicle. COCO has no word for one, so on IDD or
+    DriveIndia weights it arrives with a label the old hardcoded list did not
+    contain, and the watch silently stopped watching most of an Indian road.
+    """
+    from gaukavach.road import VEHICLE_LABELS
+    for name in ("autorickshaw", "tractor", "cart"):
+        assert name in VEHICLE_LABELS, f"{name} is not treated as a vehicle"
+
+
+def test_an_autorickshaw_stopped_in_a_lane_is_flagged():
+    w = RoadWatch(site=SITE)
+    auto = Track("A1", "autorickshaw", (620, 560, 660, 600), 0.9,
+                 history=[(640, 600)] * 8)
+    out = run(w, [auto], seconds=3.0)
+    assert STOPPED_IN_LANE in {e["kind"] for e in out["active"]}

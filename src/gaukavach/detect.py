@@ -28,6 +28,46 @@ COCO_VEHICLE = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
 ALL_CLASSES = {**COCO_HUMAN, **COCO_VEHICLE, **COCO_TARGET, **COCO_NON_TARGET_ANIMAL}
 
+# Role lookup by class NAME, so a detector trained on something other than COCO
+# can be dropped in without editing code.
+#
+# The right-hand side is the canonical label the rest of the pipeline reasons
+# about; the left is whatever a given dataset happens to call it. The Indian
+# road names come from the IDD and DriveIndia label sets, whose whole reason for
+# existing is that COCO has no word for an autorickshaw and therefore forces one
+# into "car", "truck" or "motorcycle" at random.
+#
+# `rider` is deliberately a person, not a vehicle: IDD annotates the human and
+# the motorcycle separately, and a rider inside the exposure cone is a person
+# for veto purposes regardless of what they are sitting on.
+_ROLE_SOURCES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("cow", ("cow", "cattle", "buffalo", "bull", "ox")),
+    ("dog", ("dog",)), ("horse", ("horse",)), ("sheep", ("sheep", "goat")),
+    ("elephant", ("elephant",)), ("cat", ("cat",)),
+    ("animal", ("animal",)),          # IDD's catch-all non-target animal
+    ("person", ("person", "pedestrian", "rider")),
+    ("bicycle", ("bicycle", "bike", "cycle")),
+    ("car", ("car",)),
+    ("motorcycle", ("motorcycle", "motorbike", "scooter")),
+    ("bus", ("bus",)),
+    ("truck", ("truck", "lorry", "tempo", "mini truck", "trailer", "caravan")),
+    ("autorickshaw", ("autorickshaw", "auto rickshaw", "auto", "rickshaw",
+                      "three wheeler", "tuk tuk")),
+    ("tractor", ("tractor",)),
+    ("cart", ("animal cart", "hand cart", "cart", "cycle rickshaw")),
+)
+ROLE_BY_NAME: dict[str, str] = {
+    alias: canonical for canonical, aliases in _ROLE_SOURCES for alias in aliases
+}
+
+# Roles that count as a vehicle on the road, including the ones COCO cannot
+# name. `road.py` imports this rather than keeping its own list.
+VEHICLE_ROLES = frozenset({"bicycle", "car", "motorcycle", "bus", "truck",
+                           "autorickshaw", "tractor", "cart"})
+TARGET_ROLES = frozenset({"cow"})
+NON_TARGET_ANIMAL_ROLES = frozenset({"dog", "horse", "sheep", "elephant",
+                                     "cat", "animal"})
+
 
 @dataclass
 class Detection:
@@ -453,12 +493,48 @@ class Perception:
         self.conf = conf
         self.model = None
         self.error: str | None = None
+        self.vocabulary = "coco"
+        self.classes: dict[int, str] = dict(ALL_CLASSES)
+        self.unmapped: list[str] = []
         try:
             from ultralytics import YOLO  # noqa: PLC0415
 
             self.model = YOLO(weights)
+            self._bind_vocabulary()
         except Exception as exc:  # pragma: no cover - environment dependent
             self.error = f"{type(exc).__name__}: {exc}"
+
+    def _bind_vocabulary(self) -> None:
+        """
+        Map the loaded model's OWN class ids to our roles, by name.
+
+        The ids were previously assumed to be COCO's. That holds for the
+        stock weights and breaks silently for anything else: an Indian-roads
+        detector numbers its classes differently, so filtering on COCO id 19
+        would drop the cows and admit whatever happens to be nineteenth.
+
+        Anything the model can name but we have no role for is recorded in
+        `unmapped` rather than dropped quietly, because on Indian footage that
+        list is the interesting part - it is where the autorickshaws appear
+        once you finally have a detector that can say the word.
+        """
+        names = getattr(self.model, "names", None)
+        if not names:
+            return
+        mapped: dict[int, str] = {}
+        unmapped: list[str] = []
+        for idx, raw in dict(names).items():
+            key = str(raw).strip().lower().replace("_", " ").replace("-", " ")
+            role = ROLE_BY_NAME.get(key)
+            if role is None:
+                unmapped.append(str(raw))
+                continue
+            mapped[int(idx)] = role
+        if mapped:
+            self.classes = mapped
+        self.unmapped = sorted(unmapped)
+        coco_ish = {str(v).lower() for v in dict(names).values()} >= {"person", "car", "cow"}
+        self.vocabulary = "coco" if coco_ish and len(names) >= 80 else "custom"
 
     @property
     def available(self) -> bool:
@@ -468,7 +544,7 @@ class Perception:
         if self.model is None:
             return []
         results = self.model.predict(
-            frame, conf=self.conf, classes=sorted(ALL_CLASSES), verbose=False
+            frame, conf=self.conf, classes=sorted(self.classes), verbose=False
         )
         out: list[Detection] = []
         for r in results:
@@ -477,7 +553,7 @@ class Perception:
                 continue
             for b in boxes:
                 cls_id = int(b.cls.item())
-                label = ALL_CLASSES.get(cls_id)
+                label = self.classes.get(cls_id)
                 if label is None:
                     continue
                 x1, y1, x2, y2 = (float(v) for v in b.xyxy[0].tolist())

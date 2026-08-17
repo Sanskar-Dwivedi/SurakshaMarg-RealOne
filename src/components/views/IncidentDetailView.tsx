@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { EvidenceEnvelope } from '../../data/mockData';
 import { StatusBadge } from '../common/StatusBadge';
-import { ShieldAlert, MapPin, Clock, Camera, FileCheck2, Send, CheckCircle2, User, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, MapPin, Clock, Camera, FileCheck2, Send, CheckCircle2, User, AlertTriangle, RefreshCw } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface IncidentDetailViewProps {
@@ -17,6 +17,9 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
 }) => {
   const [currentStatus, setCurrentStatus] = useState(envelope.status);
   const [patrolDispatched, setPatrolDispatched] = useState(envelope.status === 'Patrol Dispatched');
+  const [imgError, setImgError] = useState(false);
+
+  const videoSourceUrl = envelope.frameImage || 'http://localhost:8000/api/stream';
 
   const handleDispatch = () => {
     setPatrolDispatched(true);
@@ -76,42 +79,33 @@ export const IncidentDetailView: React.FC<IncidentDetailViewProps> = ({
         </div>
       </div>
 
-      {/* Frame Capture Media Viewer */}
+      {/* Frame Capture Real Video Viewer */}
       <div className="relative aspect-[16/9] bg-charcoal rounded-xl border border-charcoal-light overflow-hidden shadow-subtle flex items-center justify-center">
-        {/* Realistic Canvas Vector Frame Graphic */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none">
-          <svg className="w-full h-full" viewBox="0 0 1000 562" preserveAspectRatio="none">
-            {/* Dark Camera Environment */}
-            <rect width="1000" height="562" fill="#1C1C18" />
-            <polygon points="450,200 550,200 950,562 -50,562" fill="#292924" />
-            <line x1="280" y1="562" x2="480" y2="200" stroke="#C7B79B" strokeWidth="6" strokeDasharray="30 20" opacity="0.75" />
-            <line x1="680" y1="562" x2="520" y2="200" stroke="#C7B79B" strokeWidth="6" strokeDasharray="30 20" opacity="0.75" />
-            
-            {/* Bovine Silhouette */}
-            <g transform="translate(420, 290) scale(0.95)" fill="#121210">
-              <ellipse cx="60" cy="50" rx="35" ry="22" />
-              <circle cx="24" cy="38" r="14" />
-              <path d="M 18 28 C 14 20, 22 18, 26 24" stroke="#8C887E" strokeWidth="2.5" fill="none" />
-              <rect x="36" y="65" width="6" height="28" rx="2" />
-              <rect x="50" y="65" width="6" height="28" rx="2" />
-              <rect x="74" y="65" width="6" height="28" rx="2" />
-              <rect x="88" y="65" width="6" height="28" rx="2" />
-            </g>
-          </svg>
-        </div>
-
-        {/* Bounding Box High Risk Overlay */}
-        <div className="absolute left-[42%] top-[38%] w-[26%] h-[32%] border-2 border-status-critical bg-status-critical/10 rounded-xs pointer-events-none">
-          <div className="absolute -top-6 left-0 px-2 py-0.5 bg-status-critical text-cream text-[10px] font-mono font-bold uppercase rounded-t-xs">
-            {envelope.animalType.toUpperCase()} {envelope.confidence}%
+        {!imgError ? (
+          <img
+            src={videoSourceUrl}
+            alt={`Evidentiary frame for incident ${envelope.incidentNo}`}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center text-charcoal-subtle gap-2 p-6 text-center">
+            <AlertTriangle className="w-8 h-8 text-status-critical" />
+            <p className="text-xs font-mono text-cream font-bold">STREAM RECONNECTING...</p>
+            <button
+              onClick={() => setImgError(false)}
+              className="mt-1 px-3 py-1 rounded bg-accent-olive/30 border border-accent-olive text-cream font-mono text-xs flex items-center gap-1"
+            >
+              <RefreshCw className="w-3 h-3" /> Retry Stream
+            </button>
           </div>
-        </div>
+        )}
 
         {/* Top Media Watermark */}
-        <div className="absolute top-4 left-4 font-mono text-xs text-cream-dark bg-black/60 px-3 py-1 rounded backdrop-blur-xs border border-white/10">
-          EVIDENTIARY FRAME CAPTURE · {envelope.cameraId}
+        <div className="absolute top-4 left-4 font-mono text-xs text-cream-dark bg-black/70 px-3 py-1 rounded backdrop-blur-xs border border-white/10">
+          EVIDENTIARY STREAM · {envelope.cameraId}
         </div>
-        <div className="absolute top-4 right-4 font-mono text-xs text-cream-dark bg-black/60 px-3 py-1 rounded backdrop-blur-xs border border-white/10">
+        <div className="absolute top-4 right-4 font-mono text-xs text-cream-dark bg-black/70 px-3 py-1 rounded backdrop-blur-xs border border-white/10">
           {envelope.timestamp}
         </div>
       </div>

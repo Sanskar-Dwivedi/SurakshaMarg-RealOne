@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
-import { Camera, Detection } from '../../data/mockData';
+import { BackendCamera, BackendDetection } from '../../hooks/useGauKavachStream';
 import { CameraFeed } from '../dashboard/CameraFeed';
 import { Grid, LayoutGrid, Square, Filter } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface LiveMonitorViewProps {
-  cameras: Camera[];
-  selectedCamera: Camera;
-  onSelectCamera: (cam: Camera) => void;
-  detections: Detection[];
+  cameras: BackendCamera[];
+  selectedCamera: BackendCamera;
+  onSelectCamera: (cam: BackendCamera) => void;
+  detections: BackendDetection[];
+  fps: number;
+  latencyMs: number;
+  status: 'CONNECTING' | 'ONLINE' | 'DEGRADED' | 'OFFLINE' | 'ERROR';
+  takeSnapshot: () => Promise<any>;
+  streamUrl: string;
+  getStreamUrl?: (camId?: string) => string;
   onReviewIncident: (incidentNo: string) => void;
 }
 
@@ -17,6 +23,12 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
   selectedCamera,
   onSelectCamera,
   detections,
+  fps,
+  latencyMs,
+  status,
+  takeSnapshot,
+  streamUrl,
+  getStreamUrl,
   onReviewIncident
 }) => {
   const [gridMode, setGridMode] = useState<'1x1' | '2x2' | '3x3'>('2x2');
@@ -30,10 +42,10 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-border-warm">
         <div>
           <h1 className="text-2xl font-serif font-bold text-charcoal tracking-tight">
-            Live Camera Monitor Array
+            Live Multi-Camera Monitor Array
           </h1>
           <p className="text-xs text-charcoal-muted mt-0.5">
-            Multi-stream highway surveillance grid for simultaneous sector monitoring.
+            Simultaneous multi-angle highway video surveillance matrix across 6 active sectors.
           </p>
         </div>
 
@@ -46,11 +58,13 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
               onChange={(e) => setFilterSector(e.target.value)}
               className="bg-surface text-charcoal border border-border-warm px-3 py-1.5 rounded-lg text-xs font-medium"
             >
-              <option value="all">All Sectors (NH-44 & Corridors)</option>
+              <option value="all">All 6 Camera Sectors (NH-44 Array)</option>
               <option value="Sector 01">Sector 01 - Toll North</option>
-              <option value="Sector 02">Sector 02 - State Hwy 12</option>
-              <option value="Sector 03">Sector 03 - Median Hotspot</option>
-              <option value="Sector 05">Sector 05 - Ring Road</option>
+              <option value="Sector 02">Sector 02 - Agribelt Corridor</option>
+              <option value="Sector 03">Sector 03 - Median Crossing</option>
+              <option value="Sector 04">Sector 04 - Service Road</option>
+              <option value="Sector 05">Sector 05 - Interchange Flyover</option>
+              <option value="Sector 06">Sector 06 - Urban Peripheral</option>
             </select>
           </div>
 
@@ -98,14 +112,21 @@ export const LiveMonitorView: React.FC<LiveMonitorViewProps> = ({
         'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
       )}>
         {filteredCameras.map((cam) => {
-          const camBoxes = detections.find(d => d.cameraId === cam.id)?.boundingBoxes || [];
+          const camStreamUrl = getStreamUrl ? getStreamUrl(cam.id) : `http://localhost:8000/api/stream/${cam.id}`;
+          const camDetections = detections.filter(d => (d as any).cameraId === cam.id || (d as any).cameraId === undefined);
+
           return (
             <div key={cam.id} className="flex flex-col">
               <CameraFeed
                 camera={cam}
                 allCameras={cameras}
                 onSelectCamera={onSelectCamera}
-                boundingBoxes={camBoxes}
+                detections={camDetections}
+                streamUrl={camStreamUrl}
+                fps={cam.fps || fps}
+                latencyMs={cam.latencyMs || latencyMs}
+                status={status}
+                onTakeSnapshot={takeSnapshot}
                 onOpenIncident={onReviewIncident}
               />
             </div>

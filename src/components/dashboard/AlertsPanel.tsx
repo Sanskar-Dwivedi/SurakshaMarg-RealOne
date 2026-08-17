@@ -34,7 +34,7 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({
           </span>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[520px] overflow-y-auto pr-1">
           {alerts.map((alert) => {
             const isCritical = alert.severity === 'critical';
             return (
